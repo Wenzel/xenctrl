@@ -1,0 +1,8 @@
+[package]
+name = "xenctrl"
+version = "0.1.0"
+authors = ["Mathieu Tarral <mathieu.tarral@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+xenctrl-sys = "0.1.0"

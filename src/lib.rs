@@ -7,7 +7,7 @@ pub struct Xc {
 
 impl Xc {
 
-    pub fn new() -> Xc {
+    pub fn new() -> Self {
         let xc_handle = unsafe {
             let toto = xenctrl_sys::xc_interface_open(null_mut(), null_mut(), 0);
             toto

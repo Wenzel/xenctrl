@@ -1,8 +1,10 @@
 extern crate xenctrl_sys;
 use std::ptr::{null_mut};
+use std::os::raw::{c_void};
 
 pub struct Xc {
     handle: *mut xenctrl_sys::xc_interface,
+    evtchn_port: *mut u32,
 }
 
 impl Xc {
@@ -12,8 +14,22 @@ impl Xc {
             let toto = xenctrl_sys::xc_interface_open(null_mut(), null_mut(), 0);
             toto
         };
-        let xc = Xc { handle: xc_handle };
+        let xc = Xc { handle: xc_handle, evtchn_port: null_mut() };
         xc
+    }
+
+    pub fn monitor_enable(&self, domid: u32) -> *mut c_void {
+        let ring_page = unsafe {
+            let toto = xenctrl_sys::xc_monitor_enable(self.handle, domid, self.evtchn_port);
+            toto
+        };
+        ring_page
+    }
+
+    pub fn monitor_disable(&self, domid: u32) {
+        unsafe {
+            xenctrl_sys::xc_monitor_disable(self.handle, domid);
+        };
     }
 
     pub fn close(&mut self) {

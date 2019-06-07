@@ -32,6 +32,26 @@ impl Xc {
         };
     }
 
+    pub fn domain_pause(&self, domid: u32) -> Result<(),&str> {
+        unsafe {
+            match xenctrl_sys::xc_domain_pause(self.handle, domid) {
+                0 => return Ok(()),
+                -1 => return Err("Fail to pause domain"),
+                _ => panic!("unexpected value"),
+            }
+        };
+    }
+
+    pub fn domain_unpause(&self, domid: u32) -> Result<(),&str> {
+        unsafe {
+            match xenctrl_sys::xc_domain_unpause(self.handle, domid) {
+                0 => return Ok(()),
+                -1 => return Err("Fail to unpause domain"),
+                _ => panic!("unexpected value"),
+            }
+        };
+    }
+
     pub fn close(&mut self) {
         unsafe {
             xenctrl_sys::xc_interface_close(self.handle);

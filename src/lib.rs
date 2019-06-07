@@ -58,10 +58,15 @@ impl Xc {
         };
     }
 
-    pub fn close(&mut self) {
-        unsafe {
-            xenctrl_sys::xc_interface_close(self.handle);
+    pub fn close(&mut self) -> Result<(),&str>{
+        let result = unsafe {
+            let result = xenctrl_sys::xc_interface_close(self.handle);
+            result
         };
-        self.handle = std::ptr::null_mut();
+        match result {
+            0 => return Ok(()),
+            -1 => return Err("Fail to close xc interface"),
+            _ => panic!("unexpected value"),
+        }
     }
 }

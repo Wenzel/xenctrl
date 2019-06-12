@@ -56,7 +56,7 @@ impl Xc {
         }
     }
 
-    pub fn close(&mut self) -> Result<(),&str>{
+    fn close(&mut self) -> Result<(),&str>{
         let result = unsafe {
             xenctrl_sys::xc_interface_close(self.handle)
         };
@@ -65,5 +65,11 @@ impl Xc {
             -1 => Err("Fail to close xc interface"),
             _ => panic!("unexpected value"),
         }
+    }
+}
+
+impl Drop for Xc {
+    fn drop(&mut self) {
+        self.close().unwrap();
     }
 }

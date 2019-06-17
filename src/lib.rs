@@ -3,6 +3,9 @@ use std::io::Error;
 use std::ptr::{null_mut};
 use std::os::raw::{c_void};
 
+pub const PAGE_SHIFT: u32 = xenctrl_sys::XC_PAGE_SHIFT;
+pub const PAGE_SIZE: u32 = xenctrl_sys::XC_PAGE_SIZE;
+
 #[derive(Debug)]
 pub struct Xc {
     handle: *mut xenctrl_sys::xc_interface,

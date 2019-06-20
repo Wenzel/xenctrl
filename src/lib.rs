@@ -1,7 +1,7 @@
 extern crate xenctrl_sys;
 use std::io::Error;
 use std::ptr::{null_mut};
-use std::os::raw::{c_void};
+use std::os::raw::{c_void, c_ulong};
 
 pub const PAGE_SHIFT: u32 = xenctrl_sys::XC_PAGE_SHIFT;
 pub const PAGE_SIZE: u32 = xenctrl_sys::XC_PAGE_SIZE;
@@ -56,6 +56,19 @@ impl Xc {
                 -1 => Err("Fail to unpause domain"),
                 _ => panic!("unexpected value"),
             }
+        }
+    }
+
+    pub fn domain_maximum_gpfn(&self, domid: u32) -> Result<u64,&str> {
+        let mut max_gpfn: c_ulong = 0;
+        let ptr_max_gpfn: *mut c_ulong = &mut max_gpfn;
+        let result = unsafe {
+            xenctrl_sys::xc_domain_maximum_gpfn(self.handle, domid, ptr_max_gpfn)
+        };
+        match result {
+            0 => Ok(max_gpfn as u64),
+            -1 => Err("Fail to get max gpfn"),
+            _ => panic!("unexpected value"),
         }
     }
 

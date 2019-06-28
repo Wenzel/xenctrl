@@ -3,6 +3,11 @@ name = "xenctrl"
 version = "0.1.0"
 authors = ["Mathieu Tarral <mathieu.tarral@protonmail.com>"]
 edition = "2018"
+repository = "https://github.com/Wenzel/xenctrl"
+readme = "README.md"
+keywords = ["xen", "introspection"]
+description = "Rust bindings for Xen's xenctrl library"
+license = "GPL-3.0-only"
 
 [dependencies]
 xenctrl-sys = "0.1.1"

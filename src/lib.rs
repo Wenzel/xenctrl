@@ -1,5 +1,6 @@
 pub mod error;
 pub mod support;
+pub mod consts;
 
 #[macro_use]
 mod macros;
@@ -28,7 +29,7 @@ pub struct XenControl {
 }
 
 impl XenControl {
-    pub fn from(
+    pub fn new(
         logger: Option<&mut xentoollog_logger>,
         dombuild_logger: Option<&mut xentoollog_logger>,
         open_flags: u32,
@@ -50,7 +51,7 @@ impl XenControl {
     }
 
     pub fn default() -> Result<Self> {
-        Self::from(None, None, 0)
+        Self::new(None, None, 0)
     }
 
     pub fn monitor_enable(&mut self, domid: u32) -> Result<&PageInfo> {

@@ -1,0 +1,6 @@
+edition = "2018"
+indent_style = "block"
+format_strings = true
+merge_imports = true
+reorder_imports = true
+wrap_comments = true

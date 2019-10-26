@@ -9,6 +9,7 @@ extern crate xenctrl_sys;
 use std::{
     mem,
     ptr::{null_mut, NonNull},
+    convert::TryInto,
 };
 
 use xenctrl_sys::{
@@ -56,18 +57,20 @@ impl XenControl {
 
     pub fn monitor_enable(&mut self, domid: u32) -> Result<&PageInfo> {
         let xc = self.handle.as_ptr();
+        let domid_compat: u16 = domid.try_into().unwrap();
         let ring_page = unsafe {
             xc_clear_last_error(xc);
-            xc_monitor_enable(xc, domid, &mut self.evtchn_port as _) as *const PageInfo
+            xc_monitor_enable(xc, domid_compat, &mut self.evtchn_port as _) as *const PageInfo
         };
         last_error!(xc, &*ring_page)
     }
 
     pub fn monitor_disable(&self, domid: u32) -> Result<()> {
         let xc = self.handle.as_ptr();
+        let domid_compat: u16 = domid.try_into().unwrap();
         unsafe {
             xc_clear_last_error(xc);
-            xc_monitor_disable(xc, domid);
+            xc_monitor_disable(xc, domid_compat);
         };
         last_error!(xc, ())
     }
@@ -92,11 +95,12 @@ impl XenControl {
 
     pub fn domain_maximum_gpfn(&self, domid: u32) -> Result<u64> {
         let xc = self.handle.as_ptr();
+        let domid_compat: u16 = domid.try_into().unwrap();
         let mut max_gpfn: u64;
         unsafe {
             max_gpfn = mem::uninitialized();
             xc_clear_last_error(xc);
-            xc_domain_maximum_gpfn(xc, domid, &mut max_gpfn as _);
+            xc_domain_maximum_gpfn(xc, domid_compat, &mut max_gpfn as _);
         }
         last_error!(xc, max_gpfn)
     }

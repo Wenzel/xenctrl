@@ -1,5 +1,4 @@
 pub mod error;
-pub mod support;
 pub mod consts;
 
 #[macro_use]
@@ -22,14 +21,12 @@ use xenctrl_sys::{
 };
 
 use error::Error;
-use support::PageInfo;
 
 type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct XenControl {
     handle: NonNull<xc_interface>,
-    evtchn_port: u32,
 }
 
 impl XenControl {
@@ -50,7 +47,6 @@ impl XenControl {
             .ok_or_else(|| Error::new(xc_error_code::XC_INTERNAL_ERROR))
             .map(|handle| XenControl {
                 handle,
-                evtchn_port: 0u32,
             })
     }
 
@@ -74,13 +70,15 @@ impl XenControl {
         last_error!(xc, hvm_cpu)
     }
 
-    pub fn monitor_enable(&mut self, domid: u32) -> Result<&PageInfo> {
+    pub fn monitor_enable(&mut self, domid: u32) -> Result<(*mut c_void, u32)> {
         let xc = self.handle.as_ptr();
-        let ring_page = unsafe {
+        let domid_compat: u16 = domid.try_into().unwrap();
+        let mut remote_port: u32 = 0;
+        let ring_page: *mut c_void = unsafe {
             xc_clear_last_error(xc);
-            xc_monitor_enable(xc, domid.try_into().unwrap(), &mut self.evtchn_port as _) as *const PageInfo
+            xc_monitor_enable(xc, domid_compat, &mut remote_port)
         };
-        last_error!(xc, &*ring_page)
+        last_error!(xc, (ring_page, remote_port))
     }
 
     pub fn monitor_disable(&self, domid: u32) -> Result<()> {
@@ -114,6 +112,7 @@ impl XenControl {
         let xc = self.handle.as_ptr();
         let mut max_gpfn = mem::MaybeUninit::<u64>::uninit();
         unsafe {
+            max_gpfn = mem::MaybeUninit::zeroed().assume_init();
             xc_clear_last_error(xc);
             xc_domain_maximum_gpfn(xc, domid.try_into().unwrap(), max_gpfn.as_mut_ptr());
         }

@@ -72,11 +72,10 @@ impl XenControl {
 
     pub fn monitor_enable(&mut self, domid: u32) -> Result<(*mut c_void, u32)> {
         let xc = self.handle.as_ptr();
-        let domid_compat: u16 = domid.try_into().unwrap();
         let mut remote_port: u32 = 0;
         let ring_page: *mut c_void = unsafe {
             xc_clear_last_error(xc);
-            xc_monitor_enable(xc, domid_compat, &mut remote_port)
+            xc_monitor_enable(xc, domid.try_into().unwrap(), &mut remote_port)
         };
         last_error!(xc, (ring_page, remote_port))
     }

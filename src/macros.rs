@@ -6,7 +6,7 @@ macro_rules! last_error {
                 xc_error_code::XC_ERROR_NONE => Ok($ok),
                 code => {
                     let desc = ($self.libxenctrl.error_code_to_desc)(code as _);
-                    Err(Error::new(ffi::CStr::from_ptr(desc).to_str().unwrap()))
+                    Err(XcError::new(ffi::CStr::from_ptr(desc).to_str().unwrap()))
                 }
             }
         }

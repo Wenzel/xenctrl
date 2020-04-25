@@ -20,9 +20,9 @@ use xenctrl_sys::{
     hvm_hw_cpu, xc_error_code, xc_interface, xentoollog_logger, __HVM_SAVE_TYPE_CPU,
 };
 
-use error::Error;
+use error::XcError;
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, XcError>;
 
 #[derive(Debug)]
 pub struct XenControl {
@@ -47,7 +47,7 @@ impl XenControl {
         NonNull::new(xc_handle)
             .ok_or_else(|| {
                 let desc = (libxenctrl.error_code_to_desc)(xc_error_code::XC_INTERNAL_ERROR as _);
-                Error::new(unsafe { ffi::CStr::from_ptr(desc) }.to_str().unwrap())
+                XcError::new(unsafe { ffi::CStr::from_ptr(desc) }.to_str().unwrap())
             })
             .map(|handle| XenControl { handle, libxenctrl })
     }

@@ -27,6 +27,12 @@ type FnDomainHVMGetcontextPartial = fn(
     ctxt_buf: *mut c_void,
     size: u32,
 ) -> c_int;
+//xc_domain_hvm_getcontext
+type FnDomainHVMGetcontext =
+    fn(xch: *mut xc_interface, domid: u32, ctxt_buf: *mut c_uint, size: u32) -> c_int;
+//xc_domain_setcontext
+type FnDomainHVMSetcontext =
+    fn(xch: *mut xc_interface, domid: u32, hvm_ctxt: *mut c_uint, size: u32) -> c_int;
 // xc_monitor_enable
 type FnMonitorEnable =
     fn(xch: *mut xc_interface, domain_id: domid_t, port: *mut u32) -> *mut c_void;
@@ -50,6 +56,8 @@ pub struct LibXenCtrl {
     pub get_last_error: RawSymbol<FnGetLastError>,
     pub error_code_to_desc: RawSymbol<FnErrorCodeToDesc>,
     pub domain_hvm_getcontext_partial: RawSymbol<FnDomainHVMGetcontextPartial>,
+    pub domain_hvm_getcontext: RawSymbol<FnDomainHVMGetcontext>,
+    pub domain_hvm_setcontext: RawSymbol<FnDomainHVMSetcontext>,
     pub monitor_enable: RawSymbol<FnMonitorEnable>,
     pub monitor_disable: RawSymbol<FnMonitorDisable>,
     pub domain_pause: RawSymbol<FnDomainPause>,
@@ -81,6 +89,14 @@ impl LibXenCtrl {
             lib.get(b"xc_domain_hvm_getcontext_partial\0").unwrap();
         let domain_hvm_getcontext_partial = domain_hvm_getcontext_partial_sym.into_raw();
 
+        let domain_hvm_getcontext_sym: Symbol<FnDomainHVMGetcontext> =
+            lib.get(b"xc_domain_hvm_getcontext\0").unwrap();
+        let domain_hvm_getcontext = domain_hvm_getcontext_sym.into_raw();
+
+        let domain_hvm_setcontext_sym: Symbol<FnDomainHVMSetcontext> =
+            lib.get(b"xc_domain_hvm_setcontext\0").unwrap();
+        let domain_hvm_setcontext = domain_hvm_setcontext_sym.into_raw();
+
         let monitor_enable_sym: Symbol<FnMonitorEnable> = lib.get(b"xc_monitor_enable\0").unwrap();
         let monitor_enable = monitor_enable_sym.into_raw();
 
@@ -109,6 +125,8 @@ impl LibXenCtrl {
             get_last_error,
             error_code_to_desc,
             domain_hvm_getcontext_partial,
+            domain_hvm_getcontext,
+            domain_hvm_setcontext,
             monitor_enable,
             monitor_disable,
             domain_pause,

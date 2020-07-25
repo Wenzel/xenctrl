@@ -17,7 +17,7 @@ use std::{
 
 use libxenctrl::LibXenCtrl;
 use xenctrl_sys::{
-    hvm_hw_cpu, xc_error_code, xc_interface, xentoollog_logger, __HVM_SAVE_TYPE_CPU,
+    hvm_hw_cpu, xc_error_code, xc_interface, xen_pfn_t, xentoollog_logger, __HVM_SAVE_TYPE_CPU,
 };
 
 use error::XcError;
@@ -39,8 +39,8 @@ impl XenControl {
         let libxenctrl = unsafe { LibXenCtrl::new() };
 
         let xc_handle = (libxenctrl.interface_open)(
-            logger.map_or_else(|| null_mut(), |l| l as *mut _),
-            dombuild_logger.map_or_else(|| null_mut(), |l| l as *mut _),
+            logger.map_or_else(null_mut, |l| l as *mut _),
+            dombuild_logger.map_or_else(null_mut, |l| l as *mut _),
             open_flags,
         );
 
@@ -111,13 +111,10 @@ impl XenControl {
 
     pub fn domain_maximum_gpfn(&self, domid: u32) -> Result<u64> {
         let xc = self.handle.as_ptr();
-        let mut max_gpfn = mem::MaybeUninit::<u64>::uninit();
         (self.libxenctrl.clear_last_error)(xc);
-        unsafe {
-            max_gpfn = mem::MaybeUninit::zeroed().assume_init();
-        }
-        (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), max_gpfn.as_mut_ptr());
-        last_error!(self, max_gpfn.assume_init())
+        let mut max_gpfn: xen_pfn_t = unsafe { mem::MaybeUninit::zeroed().assume_init() };
+        (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), &mut max_gpfn);
+        last_error!(self, max_gpfn)
     }
 
     fn close(&mut self) -> Result<()> {

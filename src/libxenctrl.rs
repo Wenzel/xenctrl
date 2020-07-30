@@ -1,6 +1,8 @@
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 
-use xenctrl_sys::{domid_t, xc_error, xc_interface, xen_pfn_t, xenmem_access_t, xentoollog_logger};
+use xenctrl_sys::{
+    domid_t, xc_dominfo_t, xc_error, xc_interface, xen_pfn_t, xenmem_access_t, xentoollog_logger,
+};
 
 use libloading::{os::unix::Symbol as RawSymbol, Library, Symbol};
 use log::info;
@@ -18,6 +20,13 @@ type FnClearLastError = fn(xch: *mut xc_interface);
 type FnGetLastError = fn(handle: *mut xc_interface) -> *const xc_error;
 // xc_error_code_to_desc
 type FnErrorCodeToDesc = fn(code: c_int) -> *const c_char;
+//xc_domain_getinfo
+type FnDomainGetInfo = fn(
+    xch: *mut xc_interface,
+    first_domid: u32,
+    max_doms: c_uint,
+    info: *mut xc_dominfo_t,
+) -> c_int;
 // xc_domain_hvm_getcontext_partial
 type FnDomainHVMGetcontextPartial = fn(
     xch: *mut xc_interface,
@@ -80,6 +89,7 @@ pub struct LibXenCtrl {
     pub clear_last_error: RawSymbol<FnClearLastError>,
     pub get_last_error: RawSymbol<FnGetLastError>,
     pub error_code_to_desc: RawSymbol<FnErrorCodeToDesc>,
+    pub domain_getinfo: RawSymbol<FnDomainGetInfo>,
     pub domain_hvm_getcontext_partial: RawSymbol<FnDomainHVMGetcontextPartial>,
     pub domain_hvm_getcontext: RawSymbol<FnDomainHVMGetcontext>,
     pub domain_hvm_setcontext: RawSymbol<FnDomainHVMSetcontext>,
@@ -114,6 +124,9 @@ impl LibXenCtrl {
         let error_code_to_desc_sym: Symbol<FnErrorCodeToDesc> =
             lib.get(b"xc_error_code_to_desc\0").unwrap();
         let error_code_to_desc = error_code_to_desc_sym.into_raw();
+
+        let domain_getinfo_sym: Symbol<FnDomainGetInfo> = lib.get(b"xc_domain_getinfo\0").unwrap();
+        let domain_getinfo = domain_getinfo_sym.into_raw();
 
         let domain_hvm_getcontext_partial_sym: Symbol<FnDomainHVMGetcontextPartial> =
             lib.get(b"xc_domain_hvm_getcontext_partial\0").unwrap();
@@ -172,6 +185,7 @@ impl LibXenCtrl {
             clear_last_error,
             get_last_error,
             error_code_to_desc,
+            domain_getinfo,
             domain_hvm_getcontext_partial,
             domain_hvm_getcontext,
             domain_hvm_setcontext,

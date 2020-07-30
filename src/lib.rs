@@ -1,4 +1,3 @@
-
 pub mod consts;
 pub mod error;
 mod libxenctrl;
@@ -8,10 +7,11 @@ mod macros;
 
 extern crate xenctrl_sys;
 
-use self::consts::PAGE_SIZE;
+use self::consts::{PAGE_SHIFT, PAGE_SIZE};
 use enum_primitive_derive::Primitive;
 use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
+use std::io::Error;
 use std::{
     alloc::{alloc_zeroed, Layout},
     convert::TryInto,
@@ -20,12 +20,14 @@ use std::{
     mem,
     os::raw::c_uint,
     ptr::{null_mut, NonNull},
+    slice,
 };
 pub use xenctrl_sys::{hvm_hw_cpu, hvm_save_descriptor, __HVM_SAVE_TYPE_CPU};
 use xenctrl_sys::{xc_error_code, xc_interface, xenmem_access_t, xentoollog_logger};
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
-    VM_EVENT_REASON_WRITE_CTRLREG,
+    VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SOFTWARE_BREAKPOINT, VM_EVENT_REASON_WRITE_CTRLREG,
+    VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
 };
 
 use error::XcError;
@@ -33,10 +35,11 @@ use error::XcError;
 type Result<T> = std::result::Result<T, XcError>;
 
 #[derive(Primitive, Debug, Copy, Clone, PartialEq)]
+#[repr(u32)]
 pub enum XenCr {
-    Cr0 = 0,
-    Cr3 = 3,
-    Cr4 = 4,
+    Cr0 = VM_EVENT_X86_CR0,
+    Cr3 = VM_EVENT_X86_CR3,
+    Cr4 = VM_EVENT_X86_CR4,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -48,8 +51,7 @@ pub enum XenEventType {
     },
     Msr {
         msr_type: u32,
-        new: u64,
-        old: u64,
+        value: u64,
     },
     Breakpoint {
         gpa: u64,
@@ -198,18 +200,14 @@ impl XenControl {
     }
 
     pub fn get_request(&self, back_ring: &mut vm_event_back_ring) -> Result<vm_event_request_t> {
-        let req_init = unsafe { mem::MaybeUninit::<vm_event_request_t>::zeroed().assume_init() };
-        let req_slice: &mut [vm_event_request_t] = &mut [req_init];
         let mut req_cons = back_ring.req_cons;
         let req_from_ring = RING_GET_REQUEST!(back_ring, req_cons);
-        let req_from_ring_slice = unsafe { std::slice::from_raw_parts(req_from_ring, 1) };
-        req_slice[0..].copy_from_slice(&req_from_ring_slice[0..1]);
         req_cons += 1;
         back_ring.req_cons = req_cons;
         unsafe {
             (*(back_ring.sring)).req_event = 1 + req_cons;
         }
-        last_error!(self, (*req_slice)[0])
+        last_error!(self, req_from_ring)
     }
 
     pub fn put_response(
@@ -217,11 +215,9 @@ impl XenControl {
         rsp: &mut vm_event_response_t,
         back_ring: &mut vm_event_back_ring,
     ) -> Result<()> {
-        let rsp_slice = unsafe { std::slice::from_raw_parts(rsp, 1) };
         let mut rsp_prod = back_ring.rsp_prod_pvt;
-        let rsp_from_ring = RING_GET_RESPONSE!(back_ring, rsp_prod);
-        let rsp_from_ring_slice = unsafe { std::slice::from_raw_parts_mut(rsp_from_ring, 1) };
-        rsp_from_ring_slice[0..].copy_from_slice(&rsp_slice[0..1]);
+        let rsp_dereferenced = *rsp;
+        RING_PUT_RESPONSE!(back_ring, rsp_prod, rsp_dereferenced);
         rsp_prod += 1;
         back_ring.rsp_prod_pvt = rsp_prod;
         RING_PUSH_RESPONSES!(back_ring);
@@ -237,6 +233,14 @@ impl XenControl {
                         .unwrap(),
                     new: req.u.write_ctrlreg.new_value,
                     old: req.u.write_ctrlreg.old_value,
+                },
+                VM_EVENT_REASON_MOV_TO_MSR => XenEventType::Msr {
+                    msr_type: req.u.mov_to_msr.msr.try_into().unwrap(),
+                    value: req.u.mov_to_msr.value,
+                },
+                VM_EVENT_REASON_SOFTWARE_BREAKPOINT => XenEventType::Breakpoint {
+                    gpa: req.u.software_breakpoint.gfn << PAGE_SHIFT,
+                    insn_len: req.u.software_breakpoint.insn_length.try_into().unwrap(),
                 },
                 _ => unimplemented!(),
             };
@@ -268,14 +272,20 @@ impl XenControl {
     pub fn monitor_software_breakpoint(&self, domid: u32, enable: bool) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
+        let rc = (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
+        if rc < 0 {
+            println!("last OS error: {:?}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 
     pub fn monitor_mov_to_msr(&self, domid: u32, msr: u32, enable: bool) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_mov_to_msr)(xc, domid.try_into().unwrap(), msr, enable);
+        let rc = (self.libxenctrl.monitor_mov_to_msr)(xc, domid.try_into().unwrap(), msr, enable);
+        if rc < 0 {
+            println!("last OS error: {:?}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 
@@ -289,7 +299,7 @@ impl XenControl {
     ) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_write_ctrlreg)(
+        let rc = (self.libxenctrl.monitor_write_ctrlreg)(
             xc,
             domid.try_into().unwrap(),
             index as u16,
@@ -297,6 +307,9 @@ impl XenControl {
             sync,
             onchangeonly,
         );
+        if rc < 0 {
+            println!("last OS error: {:?}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 

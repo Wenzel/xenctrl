@@ -1,4 +1,3 @@
-
 pub mod consts;
 pub mod error;
 mod libxenctrl;
@@ -12,9 +11,9 @@ extern crate xenctrl_sys;
 
 use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
-use std::io::Error;
 use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
+use std::io::Error;
 use std::{
     alloc::{alloc_zeroed, Layout},
     convert::TryInto,
@@ -32,7 +31,8 @@ use xenctrl_sys::{
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
-    VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
+    VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3,
+    VM_EVENT_X86_CR4,
 };
 
 use error::XcError;
@@ -56,8 +56,7 @@ pub enum XenEventType {
     },
     Msr {
         msr_type: u32,
-        new: u64,
-        old: u64,
+        value: u64,
     },
     Breakpoint {
         gpa: u64,
@@ -251,6 +250,10 @@ impl XenControl {
                         .unwrap(),
                     new: req.u.write_ctrlreg.new_value,
                     old: req.u.write_ctrlreg.old_value,
+                },
+                VM_EVENT_REASON_MOV_TO_MSR => XenEventType::Msr {
+                    msr_type: req.u.mov_to_msr.msr.try_into().unwrap(),
+                    value: req.u.mov_to_msr.new_value,
                 },
                 _ => unimplemented!(),
             };

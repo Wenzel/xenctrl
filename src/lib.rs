@@ -4,12 +4,15 @@ mod libxenctrl;
 
 #[macro_use]
 mod macros;
+#[macro_use]
+extern crate log;
 
 extern crate xenctrl_sys;
 
 use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
 use num_traits::FromPrimitive;
+use std::io::Error;
 use std::{
     alloc::{alloc_zeroed, Layout},
     convert::TryInto,
@@ -18,14 +21,15 @@ use std::{
     mem,
     os::raw::c_uint,
     ptr::{null_mut, NonNull},
+    slice,
 };
 
 use libxenctrl::LibXenCtrl;
 pub use xenctrl_sys::{hvm_hw_cpu, hvm_save_descriptor, __HVM_SAVE_TYPE_CPU};
-use xenctrl_sys::{xc_error_code, xc_interface, xenmem_access_t, xentoollog_logger};
+use xenctrl_sys::{xc_dominfo_t, xc_error_code, xc_interface, xenmem_access_t, xentoollog_logger};
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
-    VM_EVENT_REASON_WRITE_CTRLREG,
+    VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
 };
 
 use error::XcError;
@@ -33,10 +37,11 @@ use error::XcError;
 type Result<T> = std::result::Result<T, XcError>;
 
 #[derive(Primitive, Debug, Copy, Clone, PartialEq)]
+#[repr(u32)]
 pub enum XenCr {
-    Cr0 = 0,
-    Cr3 = 3,
-    Cr4 = 4,
+    Cr0 = VM_EVENT_X86_CR0,
+    Cr3 = VM_EVENT_X86_CR3,
+    Cr4 = VM_EVENT_X86_CR4,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -96,6 +101,14 @@ impl XenControl {
         Self::new(None, None, 0)
     }
 
+    pub fn domain_getinfo(&self, domid: u32) -> Result<xc_dominfo_t> {
+        let xc = self.handle.as_ptr();
+        let mut domain_info = unsafe { mem::MaybeUninit::<xc_dominfo_t>::zeroed().assume_init() };
+        (self.libxenctrl.clear_last_error)(xc);
+        (self.libxenctrl.domain_getinfo)(xc, domid, 1, &mut domain_info);
+        last_error!(self, domain_info)
+    }
+
     pub fn domain_hvm_getcontext_partial(&self, domid: u32, vcpu: u16) -> Result<hvm_hw_cpu> {
         let xc = self.handle.as_ptr();
         let mut hvm_cpu: hvm_hw_cpu =
@@ -138,6 +151,7 @@ impl XenControl {
     ) -> Result<(*mut c_uint, hvm_hw_cpu, u32)> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
+        //calling with no arguments --> return is the size of buffer required for storing the HVM context
         let size =
             (self.libxenctrl.domain_hvm_getcontext)(xc, domid, std::ptr::null_mut::<u32>(), 0);
         let layout =
@@ -145,6 +159,7 @@ impl XenControl {
         #[allow(clippy::cast_ptr_alignment)]
         let buffer = unsafe { alloc_zeroed(layout) as *mut c_uint };
         (self.libxenctrl.clear_last_error)(xc);
+        //Locate runtime CPU registers in the context record. This function returns information about the context of a hvm domain.
         (self.libxenctrl.domain_hvm_getcontext)(xc, domid, buffer, size.try_into().unwrap());
         let mut offset: u32 = 0;
         let hvm_save_cpu =
@@ -152,6 +167,8 @@ impl XenControl {
         let hvm_save_code_cpu: u16 = mem::size_of_val(&hvm_save_cpu.c).try_into().unwrap();
         let mut cpu_ptr: *mut hvm_hw_cpu = std::ptr::null_mut();
         unsafe {
+            //The execution context of the hvm domain is stored in the buffer struct we passed in domain_hvm_getcontext(). We iterate from the beginning address of this struct until we find the particular descriptor having typecode HVM_SAVE_CODE(CPU) which gives us the info about the registers in the particular vcpu.
+            //Note that domain_hvm_getcontext_partial(), unlike domain_hvm_getcontext() returns only the descriptor struct having a particular typecode passed as one of its argument.
             while offset < size.try_into().unwrap() {
                 let buffer_ptr = buffer as usize;
                 let descriptor: *mut hvm_save_descriptor =
@@ -198,18 +215,14 @@ impl XenControl {
     }
 
     pub fn get_request(&self, back_ring: &mut vm_event_back_ring) -> Result<vm_event_request_t> {
-        let req_init = unsafe { mem::MaybeUninit::<vm_event_request_t>::zeroed().assume_init() };
-        let req_slice: &mut [vm_event_request_t] = &mut [req_init];
         let mut req_cons = back_ring.req_cons;
         let req_from_ring = RING_GET_REQUEST!(back_ring, req_cons);
-        let req_from_ring_slice = unsafe { std::slice::from_raw_parts(req_from_ring, 1) };
-        req_slice[0..].copy_from_slice(&req_from_ring_slice[0..1]);
         req_cons += 1;
         back_ring.req_cons = req_cons;
         unsafe {
             (*(back_ring.sring)).req_event = 1 + req_cons;
         }
-        last_error!(self, (*req_slice)[0])
+        last_error!(self, req_from_ring)
     }
 
     pub fn put_response(
@@ -217,11 +230,9 @@ impl XenControl {
         rsp: &mut vm_event_response_t,
         back_ring: &mut vm_event_back_ring,
     ) -> Result<()> {
-        let rsp_slice = unsafe { std::slice::from_raw_parts(rsp, 1) };
         let mut rsp_prod = back_ring.rsp_prod_pvt;
-        let rsp_from_ring = RING_GET_RESPONSE!(back_ring, rsp_prod);
-        let rsp_from_ring_slice = unsafe { std::slice::from_raw_parts_mut(rsp_from_ring, 1) };
-        rsp_from_ring_slice[0..].copy_from_slice(&rsp_slice[0..1]);
+        let rsp_dereferenced = *rsp;
+        RING_PUT_RESPONSE!(back_ring, rsp_prod, rsp_dereferenced);
         rsp_prod += 1;
         back_ring.rsp_prod_pvt = rsp_prod;
         RING_PUSH_RESPONSES!(back_ring);
@@ -268,14 +279,20 @@ impl XenControl {
     pub fn monitor_software_breakpoint(&self, domid: u32, enable: bool) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
+        let rc = (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
+        if rc < 0 {
+            debug!("The error is {}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 
     pub fn monitor_mov_to_msr(&self, domid: u32, msr: u32, enable: bool) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_mov_to_msr)(xc, domid.try_into().unwrap(), msr, enable);
+        let rc = (self.libxenctrl.monitor_mov_to_msr)(xc, domid.try_into().unwrap(), msr, enable);
+        if rc < 0 {
+            debug!("The error is {}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 
@@ -289,7 +306,7 @@ impl XenControl {
     ) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_write_ctrlreg)(
+        let rc = (self.libxenctrl.monitor_write_ctrlreg)(
             xc,
             domid.try_into().unwrap(),
             index as u16,
@@ -297,6 +314,9 @@ impl XenControl {
             sync,
             onchangeonly,
         );
+        if rc < 0 {
+            debug!("The error is {}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 

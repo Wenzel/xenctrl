@@ -9,7 +9,7 @@ extern crate log;
 
 extern crate xenctrl_sys;
 
-use self::consts::PAGE_SIZE;
+use self::consts::{PAGE_SHIFT, PAGE_SIZE};
 use enum_primitive_derive::Primitive;
 use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
@@ -31,8 +31,8 @@ use xenctrl_sys::{
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
-    VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3,
-    VM_EVENT_X86_CR4,
+    VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SOFTWARE_BREAKPOINT, VM_EVENT_REASON_WRITE_CTRLREG,
+    VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
 };
 
 use error::XcError;
@@ -254,6 +254,10 @@ impl XenControl {
                 VM_EVENT_REASON_MOV_TO_MSR => XenEventType::Msr {
                     msr_type: req.u.mov_to_msr.msr.try_into().unwrap(),
                     value: req.u.mov_to_msr.new_value,
+                },
+                VM_EVENT_REASON_SOFTWARE_BREAKPOINT => XenEventType::Breakpoint {
+                    gpa: req.u.software_breakpoint.gfn << PAGE_SHIFT,
+                    insn_len: req.u.software_breakpoint.insn_length.try_into().unwrap(),
                 },
                 _ => unimplemented!(),
             };

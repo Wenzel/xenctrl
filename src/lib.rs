@@ -1,4 +1,3 @@
-
 pub mod consts;
 pub mod error;
 mod libxenctrl;
@@ -12,6 +11,7 @@ use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
 use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
+use std::io::Error;
 use std::{
     alloc::{alloc_zeroed, Layout},
     convert::TryInto,
@@ -35,8 +35,8 @@ type Result<T> = std::result::Result<T, XcError>;
 #[derive(Primitive, Debug, Copy, Clone, PartialEq)]
 pub enum XenCr {
     Cr0 = 0,
-    Cr3 = 3,
-    Cr4 = 4,
+    Cr3 = 1,
+    Cr4 = 2,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -268,14 +268,20 @@ impl XenControl {
     pub fn monitor_software_breakpoint(&self, domid: u32, enable: bool) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
+        let rc = (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
+        if rc < 0 {
+            println!("last OS error: {:?}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 
     pub fn monitor_mov_to_msr(&self, domid: u32, msr: u32, enable: bool) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_mov_to_msr)(xc, domid.try_into().unwrap(), msr, enable);
+        let rc = (self.libxenctrl.monitor_mov_to_msr)(xc, domid.try_into().unwrap(), msr, enable);
+        if rc < 0 {
+            println!("last OS error: {:?}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 
@@ -289,7 +295,7 @@ impl XenControl {
     ) -> Result<()> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_write_ctrlreg)(
+        let rc = (self.libxenctrl.monitor_write_ctrlreg)(
             xc,
             domid.try_into().unwrap(),
             index as u16,
@@ -297,6 +303,9 @@ impl XenControl {
             sync,
             onchangeonly,
         );
+        if rc < 0 {
+            println!("last OS error: {:?}", Error::last_os_error());
+        }
         last_error!(self, ())
     }
 

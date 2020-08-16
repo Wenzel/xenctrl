@@ -3,11 +3,13 @@ name = "xenctrl"
 version = "0.1.0"
 authors = ["Mathieu Tarral <mathieu.tarral@protonmail.com>"]
 edition = "2018"
-repository = "https://github.com/Wenzel/xenctrl"
+description = "Safe bindings to xenctrl"
 readme = "README.md"
-keywords = ["xen", "introspection"]
-description = "Rust bindings for Xen's xenctrl library"
+homepage = "https://github.com/Wenzel/xenctrl"
+repository = "https://github.com/Wenzel/xenctrl"
 license = "GPL-3.0-only"
+keywords = ["xen", "xenctrl"]
+categories = ["api-bindings"]
 
 [dependencies]
 libloading = "0.6.1"

@@ -15,12 +15,12 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
+use error::XcError;
 use libxenctrl::LibXenCtrl;
+pub use xenctrl_sys::hvm_hw_cpu;
 use xenctrl_sys::{
     hvm_hw_cpu, xc_error_code, xc_interface, xen_pfn_t, xentoollog_logger, __HVM_SAVE_TYPE_CPU,
 };
-
-use error::XcError;
 
 type Result<T> = std::result::Result<T, XcError>;
 

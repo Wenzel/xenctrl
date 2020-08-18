@@ -52,6 +52,8 @@ type FnMonitorSoftwareBreakpoint = fn(xch: *mut xc_interface, domid: u32, enable
 //xc_monitor_mov_to_msr
 type FnMonitorMovToMsr =
     fn(xch: *mut xc_interface, domain_id: domid_t, msr: u32, enable: bool) -> c_int;
+//xc_monitor_singlestep
+type FnMonitorSinglestep = fn(xch: *mut xc_interface, domid: u32, enable: bool) -> c_int;
 //xc_monitor_write_ctrlreg
 type FnMonitorWriteCtrlreg = fn(
     xch: *mut xc_interface,
@@ -94,6 +96,7 @@ pub struct LibXenCtrl {
     pub monitor_write_ctrlreg: RawSymbol<FnMonitorWriteCtrlreg>,
     pub get_mem_access: RawSymbol<FnGetMemAccess>,
     pub set_mem_access: RawSymbol<FnSetMemAccess>,
+    pub monitor_singlestep: RawSymbol<FnMonitorSinglestep>,
 }
 
 impl LibXenCtrl {
@@ -149,6 +152,10 @@ impl LibXenCtrl {
             lib.get(b"xc_monitor_write_ctrlreg\0").unwrap();
         let monitor_write_ctrlreg = monitor_write_ctrlreg_sym.into_raw();
 
+        let monitor_singlestep_sym: Symbol<FnMonitorSinglestep> =
+            lib.get(b"xc_monitor_singlestep\0").unwrap();
+        let monitor_singlestep = monitor_singlestep_sym.into_raw();
+
         let get_mem_access_sym: Symbol<FnGetMemAccess> = lib.get(b"xc_get_mem_access\0").unwrap();
         let get_mem_access = get_mem_access_sym.into_raw();
 
@@ -182,6 +189,7 @@ impl LibXenCtrl {
             monitor_write_ctrlreg,
             get_mem_access,
             set_mem_access,
+            monitor_singlestep,
             domain_pause,
             domain_unpause,
             domain_maximum_gpfn,

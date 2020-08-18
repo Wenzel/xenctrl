@@ -28,8 +28,9 @@ use xenctrl_sys::{xc_error_code, xc_interface, xenmem_access_t, xentoollog_logge
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring, MEM_ACCESS_R,
     MEM_ACCESS_RW, MEM_ACCESS_RWX, MEM_ACCESS_RX, MEM_ACCESS_W, MEM_ACCESS_WX, MEM_ACCESS_X,
-    VM_EVENT_REASON_MEM_ACCESS, VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SOFTWARE_BREAKPOINT,
-    VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
+    VM_EVENT_REASON_MEM_ACCESS, VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SINGLESTEP,
+    VM_EVENT_REASON_SOFTWARE_BREAKPOINT, VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0,
+    VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -121,6 +122,9 @@ pub enum XenEventType {
         gva: u64,
         gpa: u64,
         access: XenPageAccess,
+    },
+    Singlestep {
+        gpa: u64,
     },
 }
 
@@ -325,6 +329,9 @@ impl XenControl {
                         flag.try_into().unwrap()
                     },
                 },
+                VM_EVENT_REASON_SINGLESTEP => XenEventType::Singlestep {
+                    gpa: req.u.singlestep.gfn << PAGE_SHIFT,
+                },
                 _ => unimplemented!(),
             };
         }
@@ -356,6 +363,16 @@ impl XenControl {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         let rc = (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
+        if rc < 0 {
+            println!("last OS error: {:?}", Error::last_os_error());
+        }
+        last_error!(self, ())
+    }
+
+    pub fn monitor_singlestep(&self, domid: u32, enable: bool) -> Result<(), XcError> {
+        let xc = self.handle.as_ptr();
+        (self.libxenctrl.clear_last_error)(xc);
+        let rc = (self.libxenctrl.monitor_singlestep)(xc, domid, enable);
         if rc < 0 {
             println!("last OS error: {:?}", Error::last_os_error());
         }

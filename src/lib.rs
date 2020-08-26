@@ -17,7 +17,8 @@ use std::{
 
 use libxenctrl::LibXenCtrl;
 use xenctrl_sys::{
-    hvm_hw_cpu, xc_error_code, xc_interface, xen_pfn_t, xentoollog_logger, __HVM_SAVE_TYPE_CPU,
+    hvm_hw_cpu, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
+    xen_pfn_t, xentoollog_logger, __HVM_SAVE_TYPE_CPU,
 };
 
 use error::XcError;
@@ -46,7 +47,7 @@ impl XenControl {
 
         NonNull::new(xc_handle)
             .ok_or_else(|| {
-                let desc = (libxenctrl.error_code_to_desc)(xc_error_code::XC_INTERNAL_ERROR as _);
+                let desc = (libxenctrl.error_code_to_desc)(xc_error_code_XC_INTERNAL_ERROR as _);
                 XcError::new(unsafe { ffi::CStr::from_ptr(desc) }.to_str().unwrap())
             })
             .map(|handle| XenControl { handle, libxenctrl })

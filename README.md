@@ -1,8 +1,6 @@
 # xenctrl
 
-[![Build Status](https://travis-ci.org/Wenzel/xenctrl.svg?branch=master)](https://travis-ci.org/Wenzel/xenctrl)
 [![Crates.io](https://img.shields.io/crates/v/xenctrl.svg)](https://crates.io/crates/xenctrl)
-[![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
 > Rust bindings for xenctrl
 
@@ -32,8 +30,6 @@ Check `xenctrl.h` header for the API.
 ## Contributing
 
 PRs accepted.
-
-Small note: If editing the Readme, please conform to the [standard-readme](https://github.com/RichardLitt/standard-readme) specification.
 
 ## License
 

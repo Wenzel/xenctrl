@@ -15,3 +15,9 @@ categories = ["api-bindings"]
 libloading = "0.6.1"
 log = "0.4.8"
 xenctrl-sys = "0.1.1"
+
+[package.metadata.release]
+# releases are managed by cargo release, but publication is done on the CI
+# this metadata prevents a misuse when --skip-publish flag is missing from cargo
+# release command line
+disable-publish = true

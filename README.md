@@ -1,5 +1,6 @@
 # xenctrl
 
+[![CI](https://github.com/Wenzel/xenctrl/workflows/CI/badge.svg)](https://github.com/Wenzel/xenctrl/actions?query=workflow%3ACI)
 [![Crates.io](https://img.shields.io/crates/v/xenctrl.svg)](https://crates.io/crates/xenctrl)
 
 > Rust bindings for xenctrl

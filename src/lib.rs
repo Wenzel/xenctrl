@@ -26,7 +26,10 @@ use std::{
 
 use libxenctrl::LibXenCtrl;
 pub use xenctrl_sys::{hvm_hw_cpu, hvm_save_descriptor, __HVM_SAVE_TYPE_CPU};
-use xenctrl_sys::{xc_dominfo_t, xc_error_code, xc_interface, xenmem_access_t, xentoollog_logger};
+use xenctrl_sys::{
+    xc_dominfo_t, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
+    xenmem_access_t, xentoollog_logger,
+};
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
     VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
@@ -344,13 +347,10 @@ impl XenControl {
     pub fn domain_maximum_gpfn(&self, domid: u32) -> Result<u64> {
         let xc = self.handle.as_ptr();
         #[allow(unused_assignments)]
-        let mut max_gpfn = mem::MaybeUninit::<u64>::uninit();
         (self.libxenctrl.clear_last_error)(xc);
-        unsafe {
-            max_gpfn = mem::MaybeUninit::zeroed().assume_init();
-        }
-        (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), max_gpfn.as_mut_ptr());
-        last_error!(self, max_gpfn.assume_init())
+        let mut max_gpfn: u64 = 0;
+        (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), &mut max_gpfn);
+        last_error!(self, max_gpfn)
     }
 
     fn close(&mut self) -> Result<()> {

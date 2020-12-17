@@ -330,7 +330,7 @@ impl XenControl {
                     },
                 },
                 VM_EVENT_REASON_SINGLESTEP => XenEventType::Singlestep {
-                    gpa: req.u.singlestep.gfn << PAGE_SHIFT,
+                    gpa: 0, // not available
                 },
                 _ => unimplemented!(),
             };

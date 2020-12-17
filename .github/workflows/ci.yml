@@ -10,7 +10,7 @@ on:
 
 jobs:
   format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Install stable toolchain with rustfmt
@@ -29,7 +29,7 @@ jobs:
           args: -- --check
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Install Xen headers and libraries
@@ -57,7 +57,7 @@ jobs:
 
   publish:
     needs: [format, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     
     # publish on crates.io
     # only if push on master, and tag is 'v*'

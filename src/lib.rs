@@ -9,7 +9,7 @@ extern crate log;
 
 extern crate xenctrl_sys;
 
-use self::consts::{PAGE_SHIFT, PAGE_SIZE};
+use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
 use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
@@ -59,6 +59,7 @@ pub enum XenEventType {
         value: u64,
     },
     Breakpoint {
+        gfn: u64,
         gpa: u64,
         insn_len: u8,
     },
@@ -256,7 +257,8 @@ impl XenControl {
                     value: req.u.mov_to_msr.new_value,
                 },
                 VM_EVENT_REASON_SOFTWARE_BREAKPOINT => XenEventType::Breakpoint {
-                    gpa: req.u.software_breakpoint.gfn << PAGE_SHIFT,
+                    gfn: req.u.software_breakpoint.gfn,
+                    gpa: 0, // not available
                     insn_len: req.u.software_breakpoint.insn_length.try_into().unwrap(),
                 },
                 _ => unimplemented!(),

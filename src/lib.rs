@@ -34,8 +34,9 @@ use xenctrl_sys::{
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
-    VM_EVENT_REASON_MEM_ACCESS, VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SOFTWARE_BREAKPOINT,
-    VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
+    VM_EVENT_REASON_MEM_ACCESS, VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SINGLESTEP,
+    VM_EVENT_REASON_SOFTWARE_BREAKPOINT, VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0,
+    VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
 };
 
 use error::XcError;
@@ -115,6 +116,9 @@ pub enum XenEventType {
         gpa: u64,
         access: xenmem_access_t,
         view: u16,
+    },
+    Singlestep {
+        gfn: u64,
     },
 }
 
@@ -320,6 +324,9 @@ impl XenControl {
                     gpa: 0, // not available
                     access: req.u.mem_access.flags,
                     view: 0,
+                },
+                VM_EVENT_REASON_SINGLESTEP => XenEventType::Singlestep {
+                    gfn: req.u.singlestep.gfn,
                 },
                 _ => unimplemented!(),
             };

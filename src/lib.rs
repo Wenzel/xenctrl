@@ -11,6 +11,7 @@ extern crate xenctrl_sys;
 
 use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
+use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
 use std::io::Error;
 use std::{
@@ -23,8 +24,6 @@ use std::{
     ptr::{null_mut, NonNull},
     slice,
 };
-
-use libxenctrl::LibXenCtrl;
 pub use xenctrl_sys::{hvm_hw_cpu, hvm_save_descriptor, __HVM_SAVE_TYPE_CPU};
 use xenctrl_sys::{
     xc_dominfo_t, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
@@ -32,7 +31,8 @@ use xenctrl_sys::{
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
-    VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
+    VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3,
+    VM_EVENT_X86_CR4,
 };
 
 use error::XcError;
@@ -56,8 +56,7 @@ pub enum XenEventType {
     },
     Msr {
         msr_type: u32,
-        new: u64,
-        old: u64,
+        value: u64,
     },
     Breakpoint {
         gpa: u64,
@@ -154,7 +153,7 @@ impl XenControl {
     ) -> Result<(*mut c_uint, hvm_hw_cpu, u32)> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        //calling with no arguments --> return is the size of buffer required for storing the HVM context
+        // calling with no arguments --> return is the size of buffer required for storing the HVM context
         let size =
             (self.libxenctrl.domain_hvm_getcontext)(xc, domid, std::ptr::null_mut::<u32>(), 0);
         let layout =
@@ -162,7 +161,7 @@ impl XenControl {
         #[allow(clippy::cast_ptr_alignment)]
         let buffer = unsafe { alloc_zeroed(layout) as *mut c_uint };
         (self.libxenctrl.clear_last_error)(xc);
-        //Locate runtime CPU registers in the context record. This function returns information about the context of a hvm domain.
+        // Locate runtime CPU registers in the context record. This function returns information about the context of a hvm domain.
         (self.libxenctrl.domain_hvm_getcontext)(xc, domid, buffer, size.try_into().unwrap());
         let mut offset: u32 = 0;
         let hvm_save_cpu =
@@ -170,8 +169,8 @@ impl XenControl {
         let hvm_save_code_cpu: u16 = mem::size_of_val(&hvm_save_cpu.c).try_into().unwrap();
         let mut cpu_ptr: *mut hvm_hw_cpu = std::ptr::null_mut();
         unsafe {
-            //The execution context of the hvm domain is stored in the buffer struct we passed in domain_hvm_getcontext(). We iterate from the beginning address of this struct until we find the particular descriptor having typecode HVM_SAVE_CODE(CPU) which gives us the info about the registers in the particular vcpu.
-            //Note that domain_hvm_getcontext_partial(), unlike domain_hvm_getcontext() returns only the descriptor struct having a particular typecode passed as one of its argument.
+            // The execution context of the hvm domain is stored in the buffer struct we passed in domain_hvm_getcontext(). We iterate from the beginning address of this struct until we find the particular descriptor having typecode HVM_SAVE_CODE(CPU) which gives us the info about the registers in the particular vcpu.
+            // Note that domain_hvm_getcontext_partial(), unlike domain_hvm_getcontext() returns only the descriptor struct having a particular typecode passed as one of its argument.
             while offset < size.try_into().unwrap() {
                 let buffer_ptr = buffer as usize;
                 let descriptor: *mut hvm_save_descriptor =
@@ -251,6 +250,10 @@ impl XenControl {
                         .unwrap(),
                     new: req.u.write_ctrlreg.new_value,
                     old: req.u.write_ctrlreg.old_value,
+                },
+                VM_EVENT_REASON_MOV_TO_MSR => XenEventType::Msr {
+                    msr_type: req.u.mov_to_msr.msr.try_into().unwrap(),
+                    value: req.u.mov_to_msr.new_value,
                 },
                 _ => unimplemented!(),
             };

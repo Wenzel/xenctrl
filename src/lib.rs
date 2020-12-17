@@ -31,8 +31,8 @@ use xenctrl_sys::{
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
-    VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0, VM_EVENT_X86_CR3,
-    VM_EVENT_X86_CR4,
+    VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SOFTWARE_BREAKPOINT, VM_EVENT_REASON_WRITE_CTRLREG,
+    VM_EVENT_X86_CR0, VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
 };
 
 use error::XcError;
@@ -59,6 +59,7 @@ pub enum XenEventType {
         value: u64,
     },
     Breakpoint {
+        gfn: u64,
         gpa: u64,
         insn_len: u8,
     },
@@ -254,6 +255,11 @@ impl XenControl {
                 VM_EVENT_REASON_MOV_TO_MSR => XenEventType::Msr {
                     msr_type: req.u.mov_to_msr.msr.try_into().unwrap(),
                     value: req.u.mov_to_msr.new_value,
+                },
+                VM_EVENT_REASON_SOFTWARE_BREAKPOINT => XenEventType::Breakpoint {
+                    gfn: req.u.software_breakpoint.gfn,
+                    gpa: 0, // not available
+                    insn_len: req.u.software_breakpoint.insn_length.try_into().unwrap(),
                 },
                 _ => unimplemented!(),
             };

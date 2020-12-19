@@ -24,7 +24,7 @@ use std::{
     ptr::{null_mut, NonNull},
     slice,
 };
-pub use xenctrl_sys::{hvm_hw_cpu, hvm_save_descriptor, __HVM_SAVE_TYPE_CPU};
+
 use xenctrl_sys::{
     xc_dominfo_t, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
     xenmem_access_t, xenmem_access_t_XENMEM_access_n, xenmem_access_t_XENMEM_access_r,
@@ -37,6 +37,12 @@ use xenvmevent_sys::{
     VM_EVENT_REASON_MEM_ACCESS, VM_EVENT_REASON_MOV_TO_MSR, VM_EVENT_REASON_SINGLESTEP,
     VM_EVENT_REASON_SOFTWARE_BREAKPOINT, VM_EVENT_REASON_WRITE_CTRLREG, VM_EVENT_X86_CR0,
     VM_EVENT_X86_CR3, VM_EVENT_X86_CR4,
+};
+
+// re-exported definitions
+pub use xenctrl_sys::{
+    hvm_hw_cpu, hvm_save_descriptor, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF,
+    XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON, __HVM_SAVE_TYPE_CPU,
 };
 
 use error::XcError;

@@ -163,6 +163,12 @@ impl XenControl {
         last_error!(self, domain_info)
     }
 
+    pub fn domain_debug_control(&self, domid: u32, op: u32, vcpu: u32) -> Result<(), XcError> {
+        (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
+        (self.libxenctrl.domain_debug_control)(self.handle.as_ptr(), domid, op, vcpu);
+        last_error!(self, ())
+    }
+
     pub fn domain_hvm_getcontext_partial(
         &self,
         domid: u32,

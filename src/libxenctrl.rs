@@ -61,6 +61,8 @@ type FnMonitorSoftwareBreakpoint = fn(xch: *mut xc_interface, domid: u32, enable
 //xc_monitor_mov_to_msr
 type FnMonitorMovToMsr =
     fn(xch: *mut xc_interface, domain_id: domid_t, msr: u32, enable: bool) -> c_int;
+// xc_monitor_singlestep
+type FnMonitorSinglestep = fn(xch: *mut xc_interface, domain_id: domid_t, enable: bool) -> c_int;
 //xc_monitor_write_ctrlreg
 type FnMonitorWriteCtrlreg = fn(
     xch: *mut xc_interface,
@@ -101,6 +103,7 @@ pub struct LibXenCtrl {
     pub interface_close: RawSymbol<FnInterfaceClose>,
     pub monitor_software_breakpoint: RawSymbol<FnMonitorSoftwareBreakpoint>,
     pub monitor_mov_to_msr: RawSymbol<FnMonitorMovToMsr>,
+    pub monitor_singlestep: RawSymbol<FnMonitorSinglestep>,
     pub monitor_write_ctrlreg: RawSymbol<FnMonitorWriteCtrlreg>,
     pub get_mem_access: RawSymbol<FnGetMemAccess>,
     pub set_mem_access: RawSymbol<FnSetMemAccess>,
@@ -158,6 +161,10 @@ impl LibXenCtrl {
             lib.get(b"xc_monitor_mov_to_msr\0").unwrap();
         let monitor_mov_to_msr = monitor_mov_to_msr_sym.into_raw();
 
+        let monitor_singlestep_sym: Symbol<FnMonitorSinglestep> =
+            lib.get(b"xc_monitor_singlestep\0").unwrap();
+        let monitor_singlestep = monitor_singlestep_sym.into_raw();
+
         let monitor_write_ctrlreg_sym: Symbol<FnMonitorWriteCtrlreg> =
             lib.get(b"xc_monitor_write_ctrlreg\0").unwrap();
         let monitor_write_ctrlreg = monitor_write_ctrlreg_sym.into_raw();
@@ -193,6 +200,7 @@ impl LibXenCtrl {
             monitor_disable,
             monitor_software_breakpoint,
             monitor_mov_to_msr,
+            monitor_singlestep,
             monitor_write_ctrlreg,
             get_mem_access,
             set_mem_access,

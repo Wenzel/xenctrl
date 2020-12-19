@@ -375,6 +375,16 @@ impl XenControl {
         last_error!(self, ())
     }
 
+    pub fn monitor_singlestep(&self, domid: u32, enable: bool) -> Result<(), XcError> {
+        (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
+        (self.libxenctrl.monitor_singlestep)(
+            self.handle.as_ptr(),
+            domid.try_into().unwrap(),
+            enable,
+        );
+        last_error!(self, ())
+    }
+
     pub fn monitor_write_ctrlreg(
         &self,
         domid: u32,

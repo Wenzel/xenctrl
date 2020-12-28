@@ -1,6 +1,6 @@
 [package]
 name = "xenctrl"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["Mathieu Tarral <mathieu.tarral@protonmail.com>"]
 edition = "2018"
 description = "Safe bindings to xenctrl"

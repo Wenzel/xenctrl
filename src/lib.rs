@@ -259,7 +259,7 @@ impl XenControl {
     pub fn monitor_enable(
         &mut self,
         domid: u32,
-    ) -> Result<(vm_event_sring, vm_event_back_ring, u32), XcError> {
+    ) -> Result<(*mut vm_event_sring, vm_event_back_ring, u32), XcError> {
         let xc = self.handle.as_ptr();
         let mut remote_port: u32 = 0;
         (self.libxenctrl.clear_last_error)(xc);
@@ -281,7 +281,7 @@ impl XenControl {
         back_ring.req_cons = 0;
         back_ring.nr_ents = __RING_SIZE!(ring_page, PAGE_SIZE);
         back_ring.sring = ring_page;
-        last_error!(self, (*ring_page, back_ring, remote_port))
+        last_error!(self, (ring_page, back_ring, remote_port))
     }
 
     pub fn get_request(

@@ -170,6 +170,7 @@ impl XenControl {
     }
 
     pub fn domain_debug_control(&self, domid: u32, op: u32, vcpu: u32) -> Result<(), XcError> {
+        debug!("domain_debug_control: op: {}, vcpu: {}", op, vcpu);
         (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
         (self.libxenctrl.domain_debug_control)(self.handle.as_ptr(), domid, op, vcpu);
         last_error!(self, ())
@@ -259,7 +260,8 @@ impl XenControl {
     pub fn monitor_enable(
         &mut self,
         domid: u32,
-    ) -> Result<(vm_event_sring, vm_event_back_ring, u32), XcError> {
+    ) -> Result<(*mut vm_event_sring, vm_event_back_ring, u32), XcError> {
+        debug!("monitor_enable");
         let xc = self.handle.as_ptr();
         let mut remote_port: u32 = 0;
         (self.libxenctrl.clear_last_error)(xc);
@@ -281,7 +283,7 @@ impl XenControl {
         back_ring.req_cons = 0;
         back_ring.nr_ents = __RING_SIZE!(ring_page, PAGE_SIZE);
         back_ring.sring = ring_page;
-        last_error!(self, (*ring_page, back_ring, remote_port))
+        last_error!(self, (ring_page, back_ring, remote_port))
     }
 
     pub fn get_request(
@@ -347,6 +349,7 @@ impl XenControl {
     }
 
     pub fn monitor_disable(&self, domid: u32) -> Result<(), XcError> {
+        debug!("monitor_disable");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.monitor_disable)(xc, domid.try_into().unwrap());
@@ -354,6 +357,7 @@ impl XenControl {
     }
 
     pub fn domain_pause(&self, domid: u32) -> Result<(), XcError> {
+        debug!("domain pause");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.domain_pause)(xc, domid);
@@ -361,6 +365,7 @@ impl XenControl {
     }
 
     pub fn domain_unpause(&self, domid: u32) -> Result<(), XcError> {
+        debug!("domain_unpause");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.domain_unpause)(xc, domid);
@@ -368,6 +373,7 @@ impl XenControl {
     }
 
     pub fn monitor_software_breakpoint(&self, domid: u32, enable: bool) -> Result<(), XcError> {
+        debug!("monitor_software_breakpoint: {}", enable);
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         let rc = (self.libxenctrl.monitor_software_breakpoint)(xc, domid, enable);
@@ -378,6 +384,7 @@ impl XenControl {
     }
 
     pub fn monitor_mov_to_msr(&self, domid: u32, msr: u32, enable: bool) -> Result<(), XcError> {
+        debug!("monitor_mov_to_msr: {:x} {}", msr, enable);
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         let rc = (self.libxenctrl.monitor_mov_to_msr)(xc, domid.try_into().unwrap(), msr, enable);
@@ -388,6 +395,7 @@ impl XenControl {
     }
 
     pub fn monitor_singlestep(&self, domid: u32, enable: bool) -> Result<(), XcError> {
+        debug!("monitor_singlestep: {}", enable);
         (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
         (self.libxenctrl.monitor_singlestep)(
             self.handle.as_ptr(),
@@ -405,6 +413,7 @@ impl XenControl {
         sync: bool,
         onchangeonly: bool,
     ) -> Result<(), XcError> {
+        debug!("monitor_write_ctrlreg: {:?} {}", index, enable);
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         let rc = (self.libxenctrl.monitor_write_ctrlreg)(
@@ -428,6 +437,7 @@ impl XenControl {
         first_pfn: u64,
         nr: u32,
     ) -> Result<(), XcError> {
+        debug!("set_mem_access: {:?} on pfn {}", access, first_pfn);
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.set_mem_access)(
@@ -441,6 +451,7 @@ impl XenControl {
     }
 
     pub fn get_mem_access(&self, domid: u32, pfn: u64) -> Result<XenPageAccess, XcError> {
+        debug!("get_mem_access");
         let xc = self.handle.as_ptr();
         let mut access: xenmem_access_t = xenmem_access_t_XENMEM_access_n;
         (self.libxenctrl.clear_last_error)(xc);
@@ -449,6 +460,7 @@ impl XenControl {
     }
 
     pub fn domain_maximum_gpfn(&self, domid: u32) -> Result<u64, XcError> {
+        debug!("domain_maximum_gfn");
         let xc = self.handle.as_ptr();
         #[allow(unused_assignments)]
         (self.libxenctrl.clear_last_error)(xc);
@@ -458,6 +470,7 @@ impl XenControl {
     }
 
     fn close(&mut self) -> Result<(), XcError> {
+        debug!("closing");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.interface_close)(xc);

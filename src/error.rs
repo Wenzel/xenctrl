@@ -2,6 +2,7 @@ use std::{
     error,
     fmt::{self, Debug, Display, Formatter},
 };
+use libloading::Error as libError;
 
 pub struct XcError {
     desc: String,
@@ -28,3 +29,9 @@ impl Debug for XcError {
 }
 
 impl error::Error for XcError {}
+
+impl From<libError> for XcError {
+    fn from(e: libError) -> Self {
+        XcError { desc: e.to_string()}
+    }
+}

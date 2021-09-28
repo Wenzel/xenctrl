@@ -4,10 +4,10 @@ use xenctrl_sys::{
     domid_t, xc_dominfo_t, xc_error, xc_interface, xen_pfn_t, xenmem_access_t, xentoollog_logger,
 };
 
-use libloading::{os::unix::Symbol as RawSymbol, Library, Symbol, Error};
+use libloading::{library_filename, os::unix::Symbol as RawSymbol, Error, Library, Symbol};
 use log::info;
 
-const LIBXENCTRL_FILENAME: &str = "libxenctrl.so";
+const LIBXENCTRL_BASENAME: &str = "xenctrl.so";
 // xc_interface_open
 type FnInterfaceOpen = fn(
     logger: *mut xentoollog_logger,
@@ -114,14 +114,14 @@ pub struct LibXenCtrl {
 
 impl LibXenCtrl {
     pub unsafe fn new() -> Result<Self, Error> {
-        info!("Loading {}", LIBXENCTRL_FILENAME);
-        let lib = Library::new(LIBXENCTRL_FILENAME)?;
+        let lib_filename = library_filename(LIBXENCTRL_BASENAME);
+        info!("Loading {}", lib_filename.to_str().unwrap());
+        let lib = Library::new(lib_filename)?;
         // load symbols
         let interface_open_sym: Symbol<FnInterfaceOpen> = lib.get(b"xc_interface_open\0")?;
         let interface_open = interface_open_sym.into_raw();
 
-        let clear_last_error_sym: Symbol<FnClearLastError> =
-            lib.get(b"xc_clear_last_error\0")?;
+        let clear_last_error_sym: Symbol<FnClearLastError> = lib.get(b"xc_clear_last_error\0")?;
         let clear_last_error = clear_last_error_sym.into_raw();
 
         let get_last_error_sym: Symbol<FnGetLastError> = lib.get(b"xc_get_last_error\0")?;
@@ -153,8 +153,7 @@ impl LibXenCtrl {
         let monitor_enable_sym: Symbol<FnMonitorEnable> = lib.get(b"xc_monitor_enable\0")?;
         let monitor_enable = monitor_enable_sym.into_raw();
 
-        let monitor_disable_sym: Symbol<FnMonitorDisable> =
-            lib.get(b"xc_monitor_disable\0")?;
+        let monitor_disable_sym: Symbol<FnMonitorDisable> = lib.get(b"xc_monitor_disable\0")?;
         let monitor_disable = monitor_disable_sym.into_raw();
 
         let domain_pause_sym: Symbol<FnDomainPause> = lib.get(b"xc_domain_pause\0")?;
@@ -189,8 +188,7 @@ impl LibXenCtrl {
             lib.get(b"xc_domain_maximum_gpfn\0")?;
         let domain_maximum_gpfn = domain_maximum_gpfn_sym.into_raw();
 
-        let interface_close_sym: Symbol<FnInterfaceClose> =
-            lib.get(b"xc_interface_close\0")?;
+        let interface_close_sym: Symbol<FnInterfaceClose> = lib.get(b"xc_interface_close\0")?;
         let interface_close = interface_close_sym.into_raw();
 
         Ok(LibXenCtrl {

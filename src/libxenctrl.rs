@@ -7,7 +7,7 @@ use xenctrl_sys::{
 use libloading::{library_filename, os::unix::Symbol as RawSymbol, Error, Library, Symbol};
 use log::info;
 
-const LIBXENCTRL_BASENAME: &str = "xenctrl.so";
+const LIBXENCTRL_BASENAME: &str = "xenctrl";
 // xc_interface_open
 type FnInterfaceOpen = fn(
     logger: *mut xentoollog_logger,

@@ -140,7 +140,7 @@ impl XenControl {
         dombuild_logger: Option<&mut xentoollog_logger>,
         open_flags: u32,
     ) -> Result<Self, XcError> {
-        let libxenctrl = unsafe { LibXenCtrl::new() };
+        let libxenctrl = unsafe { LibXenCtrl::new()? };
 
         #[allow(clippy::redundant_closure)]
         let xc_handle = (libxenctrl.interface_open)(

@@ -4,10 +4,10 @@ use xenctrl_sys::{
     domid_t, xc_dominfo_t, xc_error, xc_interface, xen_pfn_t, xenmem_access_t, xentoollog_logger,
 };
 
-use libloading::{os::unix::Symbol as RawSymbol, Library, Symbol};
+use libloading::{library_filename, os::unix::Symbol as RawSymbol, Error, Library, Symbol};
 use log::info;
 
-const LIBXENCTRL_FILENAME: &str = "libxenctrl.so";
+const LIBXENCTRL_BASENAME: &str = "xenctrl.so";
 // xc_interface_open
 type FnInterfaceOpen = fn(
     logger: *mut xentoollog_logger,
@@ -113,87 +113,85 @@ pub struct LibXenCtrl {
 }
 
 impl LibXenCtrl {
-    pub unsafe fn new() -> Self {
-        info!("Loading {}", LIBXENCTRL_FILENAME);
-        let lib = Library::new(LIBXENCTRL_FILENAME).unwrap();
+    pub unsafe fn new() -> Result<Self, Error> {
+        let lib_filename = library_filename(LIBXENCTRL_BASENAME);
+        info!("Loading {}", lib_filename.to_str().unwrap());
+        let lib = Library::new(lib_filename)?;
         // load symbols
-        let interface_open_sym: Symbol<FnInterfaceOpen> = lib.get(b"xc_interface_open\0").unwrap();
+        let interface_open_sym: Symbol<FnInterfaceOpen> = lib.get(b"xc_interface_open\0")?;
         let interface_open = interface_open_sym.into_raw();
 
-        let clear_last_error_sym: Symbol<FnClearLastError> =
-            lib.get(b"xc_clear_last_error\0").unwrap();
+        let clear_last_error_sym: Symbol<FnClearLastError> = lib.get(b"xc_clear_last_error\0")?;
         let clear_last_error = clear_last_error_sym.into_raw();
 
-        let get_last_error_sym: Symbol<FnGetLastError> = lib.get(b"xc_get_last_error\0").unwrap();
+        let get_last_error_sym: Symbol<FnGetLastError> = lib.get(b"xc_get_last_error\0")?;
         let get_last_error = get_last_error_sym.into_raw();
 
         let error_code_to_desc_sym: Symbol<FnErrorCodeToDesc> =
-            lib.get(b"xc_error_code_to_desc\0").unwrap();
+            lib.get(b"xc_error_code_to_desc\0")?;
         let error_code_to_desc = error_code_to_desc_sym.into_raw();
 
         let domain_debug_control_sym: Symbol<FnDomainDebugCOntrol> =
-            lib.get(b"xc_domain_debug_control\0").unwrap();
+            lib.get(b"xc_domain_debug_control\0")?;
         let domain_debug_control = domain_debug_control_sym.into_raw();
 
-        let domain_getinfo_sym: Symbol<FnDomainGetInfo> = lib.get(b"xc_domain_getinfo\0").unwrap();
+        let domain_getinfo_sym: Symbol<FnDomainGetInfo> = lib.get(b"xc_domain_getinfo\0")?;
         let domain_getinfo = domain_getinfo_sym.into_raw();
 
         let domain_hvm_getcontext_partial_sym: Symbol<FnDomainHVMGetcontextPartial> =
-            lib.get(b"xc_domain_hvm_getcontext_partial\0").unwrap();
+            lib.get(b"xc_domain_hvm_getcontext_partial\0")?;
         let domain_hvm_getcontext_partial = domain_hvm_getcontext_partial_sym.into_raw();
 
         let domain_hvm_getcontext_sym: Symbol<FnDomainHVMGetcontext> =
-            lib.get(b"xc_domain_hvm_getcontext\0").unwrap();
+            lib.get(b"xc_domain_hvm_getcontext\0")?;
         let domain_hvm_getcontext = domain_hvm_getcontext_sym.into_raw();
 
         let domain_hvm_setcontext_sym: Symbol<FnDomainHVMSetcontext> =
-            lib.get(b"xc_domain_hvm_setcontext\0").unwrap();
+            lib.get(b"xc_domain_hvm_setcontext\0")?;
         let domain_hvm_setcontext = domain_hvm_setcontext_sym.into_raw();
 
-        let monitor_enable_sym: Symbol<FnMonitorEnable> = lib.get(b"xc_monitor_enable\0").unwrap();
+        let monitor_enable_sym: Symbol<FnMonitorEnable> = lib.get(b"xc_monitor_enable\0")?;
         let monitor_enable = monitor_enable_sym.into_raw();
 
-        let monitor_disable_sym: Symbol<FnMonitorDisable> =
-            lib.get(b"xc_monitor_disable\0").unwrap();
+        let monitor_disable_sym: Symbol<FnMonitorDisable> = lib.get(b"xc_monitor_disable\0")?;
         let monitor_disable = monitor_disable_sym.into_raw();
 
-        let domain_pause_sym: Symbol<FnDomainPause> = lib.get(b"xc_domain_pause\0").unwrap();
+        let domain_pause_sym: Symbol<FnDomainPause> = lib.get(b"xc_domain_pause\0")?;
         let domain_pause = domain_pause_sym.into_raw();
 
         let monitor_software_breakpoint_sym: Symbol<FnMonitorSoftwareBreakpoint> =
-            lib.get(b"xc_monitor_software_breakpoint\0").unwrap();
+            lib.get(b"xc_monitor_software_breakpoint\0")?;
         let monitor_software_breakpoint = monitor_software_breakpoint_sym.into_raw();
 
         let monitor_mov_to_msr_sym: Symbol<FnMonitorMovToMsr> =
-            lib.get(b"xc_monitor_mov_to_msr\0").unwrap();
+            lib.get(b"xc_monitor_mov_to_msr\0")?;
         let monitor_mov_to_msr = monitor_mov_to_msr_sym.into_raw();
 
         let monitor_singlestep_sym: Symbol<FnMonitorSinglestep> =
-            lib.get(b"xc_monitor_singlestep\0").unwrap();
+            lib.get(b"xc_monitor_singlestep\0")?;
         let monitor_singlestep = monitor_singlestep_sym.into_raw();
 
         let monitor_write_ctrlreg_sym: Symbol<FnMonitorWriteCtrlreg> =
-            lib.get(b"xc_monitor_write_ctrlreg\0").unwrap();
+            lib.get(b"xc_monitor_write_ctrlreg\0")?;
         let monitor_write_ctrlreg = monitor_write_ctrlreg_sym.into_raw();
 
-        let get_mem_access_sym: Symbol<FnGetMemAccess> = lib.get(b"xc_get_mem_access\0").unwrap();
+        let get_mem_access_sym: Symbol<FnGetMemAccess> = lib.get(b"xc_get_mem_access\0")?;
         let get_mem_access = get_mem_access_sym.into_raw();
 
-        let set_mem_access_sym: Symbol<FnSetMemAccess> = lib.get(b"xc_set_mem_access\0").unwrap();
+        let set_mem_access_sym: Symbol<FnSetMemAccess> = lib.get(b"xc_set_mem_access\0")?;
         let set_mem_access = set_mem_access_sym.into_raw();
 
-        let domain_unpause_sym: Symbol<FnDomainUnpause> = lib.get(b"xc_domain_unpause\0").unwrap();
+        let domain_unpause_sym: Symbol<FnDomainUnpause> = lib.get(b"xc_domain_unpause\0")?;
         let domain_unpause = domain_unpause_sym.into_raw();
 
         let domain_maximum_gpfn_sym: Symbol<FnDomainMaximumGPFN> =
-            lib.get(b"xc_domain_maximum_gpfn\0").unwrap();
+            lib.get(b"xc_domain_maximum_gpfn\0")?;
         let domain_maximum_gpfn = domain_maximum_gpfn_sym.into_raw();
 
-        let interface_close_sym: Symbol<FnInterfaceClose> =
-            lib.get(b"xc_interface_close\0").unwrap();
+        let interface_close_sym: Symbol<FnInterfaceClose> = lib.get(b"xc_interface_close\0")?;
         let interface_close = interface_close_sym.into_raw();
 
-        LibXenCtrl {
+        Ok(LibXenCtrl {
             lib,
             interface_open,
             clear_last_error,
@@ -216,6 +214,6 @@ impl LibXenCtrl {
             domain_unpause,
             domain_maximum_gpfn,
             interface_close,
-        }
+        })
     }
 }

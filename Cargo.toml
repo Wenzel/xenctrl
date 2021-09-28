@@ -12,7 +12,7 @@ keywords = ["xen", "xenctrl"]
 categories = ["api-bindings"]
 
 [dependencies]
-libloading = "0.6.1"
+libloading = "0.7.0"
 log = "0.4.8"
 xenctrl-sys = "0.1.1"
 xenvmevent-sys = "0.1.3"

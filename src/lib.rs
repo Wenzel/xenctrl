@@ -267,6 +267,11 @@ impl XenControl {
         (self.libxenctrl.clear_last_error)(xc);
         let void_ring_page: *mut c_void =
             (self.libxenctrl.monitor_enable)(xc, domid.try_into().unwrap(), &mut remote_port);
+        if void_ring_page.is_null() {
+            return Err(XcError::new(
+                "Failed to enable event monitor ring: ring page is null",
+            ));
+        }
         let ring_page = void_ring_page as *mut vm_event_sring;
         unsafe {
             (*ring_page).req_prod = 0;

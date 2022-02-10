@@ -88,6 +88,9 @@ type FnSetMemAccess = fn(
 
 #[derive(Debug)]
 pub struct LibXenCtrl {
+    // `lib` is necessary to prevent unloading of `libxenctrl.so`
+    #[allow(dead_code)]
+    lib: Library,
     pub interface_open: RawSymbol<FnInterfaceOpen>,
     pub clear_last_error: RawSymbol<FnClearLastError>,
     pub get_last_error: RawSymbol<FnGetLastError>,
@@ -191,6 +194,7 @@ impl LibXenCtrl {
         let interface_close = interface_close_sym.into_raw();
 
         Ok(LibXenCtrl {
+            lib,
             interface_open,
             clear_last_error,
             get_last_error,

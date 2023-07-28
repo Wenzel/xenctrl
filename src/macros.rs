@@ -12,6 +12,17 @@ macro_rules! last_error {
             }
         }
     };
+    ($self:expr, $ok:expr, $ret: expr) => {
+        if $ret >= 0 {
+            Ok($ok)
+        } else {
+            let err = ($self.libxenctrl.get_last_error)($self.handle.as_ptr());
+            unsafe {
+                let desc = ($self.libxenctrl.error_code_to_desc)((*err).code as _);
+                Err(XcError::new(ffi::CStr::from_ptr(desc).to_str().unwrap()))
+            }
+        }
+    };
 }
 
 macro_rules! __RING_SIZE {

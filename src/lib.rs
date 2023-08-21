@@ -186,7 +186,7 @@ impl XenControl {
 
     pub fn domain_getinfo(&self, domid: u32) -> Result<Option<xc_dominfo_t>, XcError> {
         let xc = self.handle.as_ptr();
-        let mut domain_info = unsafe { mem::MaybeUninit::<xc_dominfo_t>::zeroed().assume_init() };
+        let mut domain_info = unsafe { mem::zeroed() };
         (self.libxenctrl.clear_last_error)(xc);
         let count = (self.libxenctrl.domain_getinfo)(xc, domid, 1, &mut domain_info);
         last_error!(
@@ -209,13 +209,11 @@ impl XenControl {
         vcpu: u16,
     ) -> Result<hvm_hw_cpu, XcError> {
         let xc = self.handle.as_ptr();
-        let mut hvm_cpu: hvm_hw_cpu =
-            unsafe { mem::MaybeUninit::<hvm_hw_cpu>::zeroed().assume_init() };
+        let mut hvm_cpu: hvm_hw_cpu = unsafe { mem::zeroed() };
         // cast to mut c_void*
         let hvm_cpu_ptr = &mut hvm_cpu as *mut _ as *mut c_void;
         let hvm_size: u32 = mem::size_of::<hvm_hw_cpu>().try_into().unwrap();
-        let hvm_save_cpu =
-            unsafe { mem::MaybeUninit::<__HVM_SAVE_TYPE_CPU>::zeroed().assume_init() };
+        let hvm_save_cpu: __HVM_SAVE_TYPE_CPU = unsafe { mem::zeroed() };
         let hvm_save_code_cpu: u16 = mem::size_of_val(&hvm_save_cpu.c).try_into().unwrap();
 
         (self.libxenctrl.clear_last_error)(xc);
@@ -261,8 +259,7 @@ impl XenControl {
         // Locate runtime CPU registers in the context record. This function returns information about the context of a hvm domain.
         (self.libxenctrl.domain_hvm_getcontext)(xc, domid, buffer, size.try_into().unwrap());
         let mut offset: u32 = 0;
-        let hvm_save_cpu =
-            unsafe { mem::MaybeUninit::<__HVM_SAVE_TYPE_CPU>::zeroed().assume_init() };
+        let hvm_save_cpu: __HVM_SAVE_TYPE_CPU = unsafe { mem::zeroed() };
         let hvm_save_code_cpu: u16 = mem::size_of_val(&hvm_save_cpu.c).try_into().unwrap();
         let mut cpu_ptr: *mut hvm_hw_cpu = std::ptr::null_mut();
         unsafe {
@@ -306,12 +303,11 @@ impl XenControl {
             (*ring_page).rsp_prod = 0;
             (*ring_page).req_event = 1;
             (*ring_page).rsp_event = 1;
-            (*ring_page).pvt.pvt_pad = mem::MaybeUninit::zeroed().assume_init();
-            (*ring_page).__pad = mem::MaybeUninit::zeroed().assume_init();
+            (*ring_page).pvt.pvt_pad = mem::zeroed();
+            (*ring_page).__pad = mem::zeroed();
         }
         // BACK_RING_INIT(&back_ring, ring_page, XC_PAGE_SIZE);
-        let mut back_ring: vm_event_back_ring =
-            unsafe { mem::MaybeUninit::<vm_event_back_ring>::zeroed().assume_init() };
+        let mut back_ring: vm_event_back_ring = unsafe { mem::zeroed() };
         back_ring.rsp_prod_pvt = 0;
         back_ring.req_cons = 0;
         back_ring.nr_ents = __RING_SIZE!(ring_page, PAGE_SIZE);
@@ -506,7 +502,7 @@ impl XenControl {
     pub fn vcpu_getinfo(&self, domid: u32, vcpu: u32) -> Result<xc_vcpuinfo_t, XcError> {
         debug!("vcpu_getinfo");
         let xc = self.handle.as_ptr();
-        let mut vcpu_info = unsafe { mem::MaybeUninit::<xc_vcpuinfo_t>::zeroed().assume_init() };
+        let mut vcpu_info = unsafe { mem::zeroed() };
 
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.vcpu_getinfo)(xc, domid, vcpu, &mut vcpu_info);
@@ -517,7 +513,7 @@ impl XenControl {
     pub fn physinfo(&self) -> Result<xc_physinfo_t, XcError> {
         debug!("physinfo");
         let xc = self.handle.as_ptr();
-        let mut physinfo = unsafe { mem::MaybeUninit::<xc_physinfo_t>::zeroed().assume_init() };
+        let mut physinfo = unsafe { mem::zeroed() };
 
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.physinfo)(xc, &mut physinfo);

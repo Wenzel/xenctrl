@@ -13,24 +13,24 @@ use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
 use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
-use std::io::Error;
 use std::{
     alloc::{alloc_zeroed, Layout},
     convert::{From, TryFrom, TryInto},
-    ffi,
-    ffi::c_void,
+    ffi::{self, c_void},
+    io::Error,
     mem,
-    os::raw::c_uint,
+    os::raw::{c_int, c_uint},
     ptr::{null_mut, NonNull},
     slice,
 };
 
 use xenctrl_sys::{
-    xc_dominfo_t, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
-    xenmem_access_t, xenmem_access_t_XENMEM_access_n, xenmem_access_t_XENMEM_access_r,
-    xenmem_access_t_XENMEM_access_rw, xenmem_access_t_XENMEM_access_rwx,
-    xenmem_access_t_XENMEM_access_rx, xenmem_access_t_XENMEM_access_w,
-    xenmem_access_t_XENMEM_access_wx, xenmem_access_t_XENMEM_access_x, xentoollog_logger,
+    xc_cx_stat, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
+    xc_px_stat, xc_px_val, xenmem_access_t, xenmem_access_t_XENMEM_access_n,
+    xenmem_access_t_XENMEM_access_r, xenmem_access_t_XENMEM_access_rw,
+    xenmem_access_t_XENMEM_access_rwx, xenmem_access_t_XENMEM_access_rx,
+    xenmem_access_t_XENMEM_access_w, xenmem_access_t_XENMEM_access_wx,
+    xenmem_access_t_XENMEM_access_x, xentoollog_logger,
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
@@ -41,8 +41,8 @@ use xenvmevent_sys::{
 
 // re-exported definitions
 pub use xenctrl_sys::{
-    hvm_hw_cpu, hvm_save_descriptor, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF,
-    XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON, __HVM_SAVE_TYPE_CPU,
+    hvm_hw_cpu, hvm_save_descriptor, xc_cpuinfo_t, xc_dominfo_t, xc_physinfo_t, xc_vcpuinfo_t,
+    XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON, __HVM_SAVE_TYPE_CPU,
 };
 
 use error::XcError;
@@ -132,6 +132,29 @@ pub enum XenEventType {
 pub struct XenControl {
     handle: NonNull<xc_interface>,
     libxenctrl: LibXenCtrl,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PxStat {
+    pub total: u8,
+    pub usable: u8,
+    pub last: u8,
+    pub cur: u8,
+    pub transition_table: Vec<u64>,
+    pub values: Vec<xc_px_val>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CxStat {
+    pub nr: u32,
+    pub last: u32,
+    pub idle_time: u64,
+    pub triggers: Vec<u64>,
+    pub residencies: Vec<u64>,
+    pub nr_pc: u32,
+    pub nr_cc: u32,
+    pub pc: Vec<u64>,
+    pub cc: Vec<u64>,
 }
 
 impl XenControl {
@@ -478,6 +501,156 @@ impl XenControl {
         let rc =
             (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), &mut max_gpfn);
         last_error!(self, max_gpfn, rc)
+    }
+
+    pub fn vcpu_getinfo(&self, domid: u32, vcpu: u32) -> Result<xc_vcpuinfo_t, XcError> {
+        debug!("vcpu_getinfo");
+        let xc = self.handle.as_ptr();
+        let mut vcpu_info = unsafe { mem::MaybeUninit::<xc_vcpuinfo_t>::zeroed().assume_init() };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        (self.libxenctrl.vcpu_getinfo)(xc, domid, vcpu, &mut vcpu_info);
+
+        last_error!(self, vcpu_info)
+    }
+
+    pub fn physinfo(&self) -> Result<xc_physinfo_t, XcError> {
+        debug!("physinfo");
+        let xc = self.handle.as_ptr();
+        let mut physinfo = unsafe { mem::MaybeUninit::<xc_physinfo_t>::zeroed().assume_init() };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        (self.libxenctrl.physinfo)(xc, &mut physinfo);
+
+        last_error!(self, physinfo)
+    }
+
+    pub fn get_cpuinfo<'a>(
+        &'_ self,
+        infos: &'a mut [mem::MaybeUninit<xc_cpuinfo_t>],
+    ) -> Result<&'a [xc_cpuinfo_t], XcError> {
+        debug!("get_cpuinfo");
+        let xc = self.handle.as_ptr();
+        let mut nr_cpu = 0i32;
+
+        (self.libxenctrl.clear_last_error)(xc);
+        (self.libxenctrl.get_cpuinfo)(xc, infos.len() as i32, infos.as_mut_ptr() as _, &mut nr_cpu);
+
+        assert!((nr_cpu as usize) <= infos.len());
+
+        last_error!(
+            self,
+            // Reinterpret infos slice as [xc_cpuinfo_t], which is valid as :
+            //  - MaybeUninit is repr(transparent)
+            //  - infos outlives its return value due to explicit borrow
+            //  - nr_cpu <= infos.len()
+            slice::from_raw_parts(infos.as_ptr() as _, nr_cpu as usize)
+        )
+    }
+
+    pub fn get_cpufreq_avg(&self, cpuid: u32) -> Result<u32, XcError> {
+        debug!("get_cpufreq_avg");
+        let xc = self.handle.as_ptr();
+        let mut freq: c_int = 0;
+
+        (self.libxenctrl.clear_last_error)(xc);
+        (self.libxenctrl.get_cpufreq_avgfreq)(xc, cpuid as c_int, &mut freq);
+
+        last_error!(self, freq as _)
+    }
+
+    pub fn get_pxstat(&self, cpuid: u32, px_stat: &mut PxStat) -> Result<(), XcError> {
+        debug!("get_pxstat");
+        let xc = self.handle.as_ptr();
+
+        let mut max_px: c_int = 0;
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let ret = (self.libxenctrl.get_max_px)(xc, cpuid as _, &mut max_px);
+
+        if ret != 0 {
+            return last_error!(self, ());
+        }
+
+        px_stat.values.resize(
+            max_px as _,
+            xc_px_val {
+                freq: 0,
+                residency: 0,
+                count: 0,
+            },
+        );
+
+        px_stat
+            .transition_table
+            .resize((max_px * max_px) as usize, 0);
+
+        let mut px_stat_ffi = xc_px_stat {
+            total: 0,
+            usable: 0,
+            last: 0,
+            cur: 0,
+            trans_pt: px_stat.transition_table.as_mut_ptr(),
+            pt: px_stat.values.as_mut_ptr(),
+        };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let ret = (self.libxenctrl.get_pxstat)(xc, cpuid as c_int, &mut px_stat_ffi);
+
+        if ret == 0 {
+            px_stat.total = px_stat_ffi.total;
+            px_stat.usable = px_stat_ffi.usable;
+            px_stat.last = px_stat_ffi.last;
+            px_stat.cur = px_stat_ffi.cur;
+        }
+
+        last_error!(self, ())
+    }
+
+    pub fn get_cxstat(&self, cpuid: u32, cx_stat: &mut CxStat) -> Result<(), XcError> {
+        debug!("get_cxstat");
+        let xc = self.handle.as_ptr();
+        let mut max_cx: c_int = 0;
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let ret = (self.libxenctrl.get_max_cx)(xc, cpuid as _, &mut max_cx);
+
+        if ret != 0 {
+            return last_error!(self, ());
+        }
+
+        const MAX_PKG_RESIDENCIES: usize = 12;
+        const MAX_CORE_RESIDENCIES: usize = 8;
+
+        cx_stat.triggers.resize(max_cx as _, 0);
+        cx_stat.residencies.resize(max_cx as _, 0);
+        cx_stat.pc.resize(MAX_PKG_RESIDENCIES, 0);
+        cx_stat.cc.resize(MAX_CORE_RESIDENCIES, 0);
+
+        let mut cx_stat_ffi = xc_cx_stat {
+            nr: max_cx as u32,
+            last: 0,
+            idle_time: 0,
+            triggers: cx_stat.triggers.as_mut_ptr(),
+            residencies: cx_stat.residencies.as_mut_ptr(),
+            nr_pc: MAX_PKG_RESIDENCIES as u32,
+            nr_cc: MAX_CORE_RESIDENCIES as u32,
+            pc: cx_stat.pc.as_mut_ptr(),
+            cc: cx_stat.cc.as_mut_ptr(),
+        };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        (self.libxenctrl.get_cxstat)(xc, cpuid as c_int, &mut cx_stat_ffi);
+
+        if ret == 0 {
+            cx_stat.nr = cx_stat_ffi.nr;
+            cx_stat.last = cx_stat_ffi.last;
+            cx_stat.idle_time = cx_stat_ffi.idle_time;
+            cx_stat.nr_pc = cx_stat_ffi.nr_pc;
+            cx_stat.nr_cc = cx_stat_ffi.nr_cc;
+        }
+
+        last_error!(self, ())
     }
 
     fn close(&mut self) -> Result<(), XcError> {

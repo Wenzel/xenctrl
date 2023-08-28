@@ -1,7 +1,8 @@
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 
 use xenctrl_sys::{
-    domid_t, xc_dominfo_t, xc_error, xc_interface, xen_pfn_t, xenmem_access_t, xentoollog_logger,
+    domid_t, xc_cpuinfo_t, xc_cx_stat, xc_dominfo_t, xc_error, xc_interface, xc_physinfo_t,
+    xc_px_stat, xc_vcpuinfo_t, xen_pfn_t, xenmem_access_t, xentoollog_logger,
 };
 
 use libloading::{library_filename, os::unix::Symbol as RawSymbol, Error, Library, Symbol};
@@ -85,6 +86,28 @@ type FnSetMemAccess = fn(
     first_pfn: u64,
     nr: u32,
 ) -> c_int;
+// xc_vcpu_getinfo
+type FnVcpuGetInfo =
+    fn(xch: *mut xc_interface, domid: u32, vcpu: u32, info: *mut xc_vcpuinfo_t) -> c_int;
+// xc_getcpuinfo(
+type FnGetCpuInfo = fn(
+    xch: *mut xc_interface,
+    max_cpus: c_int,
+    info: *mut xc_cpuinfo_t,
+    nr_cpus: *mut c_int,
+) -> c_int;
+// xc_physinfo
+type FnPhysInfo = fn(xch: *mut xc_interface, info: *mut xc_physinfo_t) -> c_int;
+// xc_get_cpufreq_avgfreq
+type FnGetCpuFreqAvg = fn(xch: *mut xc_interface, cpuid: c_int, avg_freq: *mut c_int) -> c_int;
+// xc_pm_get_max_px
+type FnGetMaxPx = fn(xch: *mut xc_interface, cpuid: c_int, max_px: *mut c_int) -> c_int;
+// xc_pm_get_pxstat
+type FnGetPxStat = fn(xch: *mut xc_interface, cpuid: c_int, pxpt: *mut xc_px_stat) -> c_int;
+// xc_pm_get_max_cx
+type FnGetMaxCx = fn(xch: *mut xc_interface, cpuid: c_int, max_cx: *mut c_int) -> c_int;
+// xc_pm_get_cxstat
+type FnGetCxStat = fn(xch: *mut xc_interface, cpuid: c_int, cxpt: *mut xc_cx_stat) -> c_int;
 
 #[derive(Debug)]
 pub struct LibXenCtrl {
@@ -112,6 +135,14 @@ pub struct LibXenCtrl {
     pub monitor_write_ctrlreg: RawSymbol<FnMonitorWriteCtrlreg>,
     pub get_mem_access: RawSymbol<FnGetMemAccess>,
     pub set_mem_access: RawSymbol<FnSetMemAccess>,
+    pub vcpu_getinfo: RawSymbol<FnVcpuGetInfo>,
+    pub get_cpuinfo: RawSymbol<FnGetCpuInfo>,
+    pub physinfo: RawSymbol<FnPhysInfo>,
+    pub get_cpufreq_avgfreq: RawSymbol<FnGetCpuFreqAvg>,
+    pub get_max_px: RawSymbol<FnGetMaxPx>,
+    pub get_pxstat: RawSymbol<FnGetPxStat>,
+    pub get_max_cx: RawSymbol<FnGetMaxCx>,
+    pub get_cxstat: RawSymbol<FnGetCxStat>,
 }
 
 impl LibXenCtrl {
@@ -193,6 +224,31 @@ impl LibXenCtrl {
         let interface_close_sym: Symbol<FnInterfaceClose> = lib.get(b"xc_interface_close\0")?;
         let interface_close = interface_close_sym.into_raw();
 
+        let vcpu_getinfo_sym: Symbol<FnVcpuGetInfo> = lib.get(b"xc_vcpu_getinfo\0")?;
+        let vcpu_getinfo = vcpu_getinfo_sym.into_raw();
+
+        let get_cpuinfo_sym: Symbol<FnGetCpuInfo> = lib.get(b"xc_getcpuinfo\0")?;
+        let get_cpuinfo = get_cpuinfo_sym.into_raw();
+
+        let physinfo_sym: Symbol<FnPhysInfo> = lib.get(b"xc_physinfo\0")?;
+        let physinfo = physinfo_sym.into_raw();
+
+        let get_cpufreq_avgfreq_sym: Symbol<FnGetCpuFreqAvg> =
+            lib.get(b"xc_get_cpufreq_avgfreq\0")?;
+        let get_cpufreq_avgfreq = get_cpufreq_avgfreq_sym.into_raw();
+
+        let get_max_px_sym: Symbol<FnGetMaxPx> = lib.get(b"xc_pm_get_max_px\0")?;
+        let get_max_px = get_max_px_sym.into_raw();
+
+        let get_pxstat_sym: Symbol<FnGetPxStat> = lib.get(b"xc_pm_get_pxstat\0")?;
+        let get_pxstat = get_pxstat_sym.into_raw();
+
+        let get_max_cx_sym: Symbol<FnGetMaxCx> = lib.get(b"xc_pm_get_max_cx\0")?;
+        let get_max_cx = get_max_cx_sym.into_raw();
+
+        let get_cxstat_sym: Symbol<FnGetCxStat> = lib.get(b"xc_pm_get_cxstat\0")?;
+        let get_cxstat = get_cxstat_sym.into_raw();
+
         Ok(LibXenCtrl {
             lib,
             interface_open,
@@ -216,6 +272,14 @@ impl LibXenCtrl {
             domain_unpause,
             domain_maximum_gpfn,
             interface_close,
+            vcpu_getinfo,
+            get_cpuinfo,
+            physinfo,
+            get_cpufreq_avgfreq,
+            get_max_px,
+            get_pxstat,
+            get_max_cx,
+            get_cxstat,
         })
     }
 }

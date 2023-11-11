@@ -161,12 +161,12 @@ impl XenControl {
         Self::new(None, None, 0)
     }
 
-    pub fn domain_getinfo(&self, domid: u32) -> Result<xc_dominfo_t, XcError> {
+    pub fn domain_getinfo(&self, domid: u32) -> Result<Option<xc_dominfo_t>, XcError> {
         let xc = self.handle.as_ptr();
         let mut domain_info = unsafe { mem::MaybeUninit::<xc_dominfo_t>::zeroed().assume_init() };
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.domain_getinfo)(xc, domid, 1, &mut domain_info);
-        last_error!(self, domain_info)
+        let count = (self.libxenctrl.domain_getinfo)(xc, domid, 1, &mut domain_info);
+        last_error!(self, if count == 1 { Some(domain_info) } else { None })
     }
 
     pub fn domain_debug_control(&self, domid: u32, op: u32, vcpu: u32) -> Result<(), XcError> {

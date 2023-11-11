@@ -9,33 +9,31 @@ on:
   pull_request:
 
 jobs:
-  format:
-    runs-on: ubuntu-20.04
-
+  check:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        subcommand: ['fmt', 'build', 'clippy', 'test']
+        include:
+            - subcommand: 'clippy'
+              # treat warnings as errors
+              args: '-- -D warnings'
+            - subcommand: 'fmt'
+              args: '--check'
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Rustfmt check
-        run: cargo fmt --check
-
-  build:
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Install Xen headers and libraries
+      - name: Install crate dependencies
         run: sudo apt-get install -y libxen-dev
 
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/checkout@v1
-
-      - name: Build crate with clippy warnings
-        run: cargo clippy
+      - run: cargo ${{ matrix.subcommand }} ${{ matrix.args }}
 
   publish:
-    needs: [format, build]
-    runs-on: ubuntu-20.04
+    needs: [check]
+    runs-on: ubuntu-22.04
     
     # publish on crates.io
     # only if push on master, and tag is 'v*'
@@ -46,7 +44,7 @@ jobs:
       - name: Install Xen headers and libraries
         run: sudo apt-get install -y libxen-dev
 
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
         
       - uses: dtolnay/rust-toolchain@stable
 

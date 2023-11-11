@@ -157,7 +157,7 @@ impl XenControl {
             .map(|handle| XenControl { handle, libxenctrl })
     }
 
-    pub fn default() -> Result<Self, XcError> {
+    pub fn new_default() -> Result<Self, XcError> {
         Self::new(None, None, 0)
     }
 

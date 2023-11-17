@@ -288,7 +288,7 @@ impl XenControl {
         back_ring.req_cons = 0;
         back_ring.nr_ents = __RING_SIZE!(ring_page, PAGE_SIZE);
         back_ring.sring = ring_page;
-        last_error!(self, (ring_page, back_ring, remote_port))
+        Ok((ring_page, back_ring, remote_port))
     }
 
     pub fn get_request(

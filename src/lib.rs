@@ -302,7 +302,7 @@ impl XenControl {
         unsafe {
             (*(back_ring.sring)).req_event = 1 + req_cons;
         }
-        last_error!(self, req_from_ring)
+        Ok(req_from_ring)
     }
 
     pub fn put_response(
@@ -316,7 +316,7 @@ impl XenControl {
         rsp_prod += 1;
         back_ring.rsp_prod_pvt = rsp_prod;
         RING_PUSH_RESPONSES!(back_ring);
-        last_error!(self, ())
+        Ok(())
     }
 
     pub fn get_event_type(&self, req: vm_event_request_t) -> Result<XenEventType, XcError> {
@@ -350,7 +350,7 @@ impl XenControl {
                 _ => unimplemented!(),
             };
         }
-        last_error!(self, ev_type)
+        Ok(ev_type)
     }
 
     pub fn monitor_disable(&self, domid: u32) -> Result<(), XcError> {

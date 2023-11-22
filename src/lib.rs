@@ -166,14 +166,18 @@ impl XenControl {
         let mut domain_info = unsafe { mem::MaybeUninit::<xc_dominfo_t>::zeroed().assume_init() };
         (self.libxenctrl.clear_last_error)(xc);
         let count = (self.libxenctrl.domain_getinfo)(xc, domid, 1, &mut domain_info);
-        last_error!(self, if count == 1 { Some(domain_info) } else { None })
+        last_error!(
+            self,
+            if count == 1 { Some(domain_info) } else { None },
+            count
+        )
     }
 
     pub fn domain_debug_control(&self, domid: u32, op: u32, vcpu: u32) -> Result<(), XcError> {
         debug!("domain_debug_control: op: {}, vcpu: {}", op, vcpu);
         (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
-        (self.libxenctrl.domain_debug_control)(self.handle.as_ptr(), domid, op, vcpu);
-        last_error!(self, ())
+        let rc = (self.libxenctrl.domain_debug_control)(self.handle.as_ptr(), domid, op, vcpu);
+        last_error!(self, (), rc)
     }
 
     pub fn domain_hvm_getcontext_partial(
@@ -192,7 +196,7 @@ impl XenControl {
         let hvm_save_code_cpu: u16 = mem::size_of_val(&hvm_save_cpu.c).try_into().unwrap();
 
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.domain_hvm_getcontext_partial)(
+        let rc = (self.libxenctrl.domain_hvm_getcontext_partial)(
             xc,
             domid,
             hvm_save_code_cpu,
@@ -200,7 +204,7 @@ impl XenControl {
             hvm_cpu_ptr,
             hvm_size,
         );
-        last_error!(self, hvm_cpu)
+        last_error!(self, hvm_cpu, rc)
     }
 
     pub fn domain_hvm_setcontext(
@@ -211,8 +215,9 @@ impl XenControl {
     ) -> Result<(), XcError> {
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.domain_hvm_setcontext)(xc, domid, buffer, size.try_into().unwrap());
-        last_error!(self, ())
+        let rc =
+            (self.libxenctrl.domain_hvm_setcontext)(xc, domid, buffer, size.try_into().unwrap());
+        last_error!(self, (), rc)
     }
 
     pub fn domain_hvm_getcontext(
@@ -288,7 +293,7 @@ impl XenControl {
         back_ring.req_cons = 0;
         back_ring.nr_ents = __RING_SIZE!(ring_page, PAGE_SIZE);
         back_ring.sring = ring_page;
-        last_error!(self, (ring_page, back_ring, remote_port))
+        Ok((ring_page, back_ring, remote_port))
     }
 
     pub fn get_request(
@@ -302,7 +307,7 @@ impl XenControl {
         unsafe {
             (*(back_ring.sring)).req_event = 1 + req_cons;
         }
-        last_error!(self, req_from_ring)
+        Ok(req_from_ring)
     }
 
     pub fn put_response(
@@ -316,7 +321,7 @@ impl XenControl {
         rsp_prod += 1;
         back_ring.rsp_prod_pvt = rsp_prod;
         RING_PUSH_RESPONSES!(back_ring);
-        last_error!(self, ())
+        Ok(())
     }
 
     pub fn get_event_type(&self, req: vm_event_request_t) -> Result<XenEventType, XcError> {
@@ -350,31 +355,31 @@ impl XenControl {
                 _ => unimplemented!(),
             };
         }
-        last_error!(self, ev_type)
+        Ok(ev_type)
     }
 
     pub fn monitor_disable(&self, domid: u32) -> Result<(), XcError> {
         debug!("monitor_disable");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.monitor_disable)(xc, domid.try_into().unwrap());
-        last_error!(self, ())
+        let rc = (self.libxenctrl.monitor_disable)(xc, domid.try_into().unwrap());
+        last_error!(self, (), rc)
     }
 
     pub fn domain_pause(&self, domid: u32) -> Result<(), XcError> {
         debug!("domain pause");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.domain_pause)(xc, domid);
-        last_error!(self, ())
+        let rc = (self.libxenctrl.domain_pause)(xc, domid);
+        last_error!(self, (), rc)
     }
 
     pub fn domain_unpause(&self, domid: u32) -> Result<(), XcError> {
         debug!("domain_unpause");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.domain_unpause)(xc, domid);
-        last_error!(self, ())
+        let rc = (self.libxenctrl.domain_unpause)(xc, domid);
+        last_error!(self, (), rc)
     }
 
     pub fn monitor_software_breakpoint(&self, domid: u32, enable: bool) -> Result<(), XcError> {
@@ -385,7 +390,7 @@ impl XenControl {
         if rc < 0 {
             debug!("The error is {}", Error::last_os_error());
         }
-        last_error!(self, ())
+        last_error!(self, (), rc)
     }
 
     pub fn monitor_mov_to_msr(&self, domid: u32, msr: u32, enable: bool) -> Result<(), XcError> {
@@ -396,18 +401,18 @@ impl XenControl {
         if rc < 0 {
             debug!("The error is {}", Error::last_os_error());
         }
-        last_error!(self, ())
+        last_error!(self, (), rc)
     }
 
     pub fn monitor_singlestep(&self, domid: u32, enable: bool) -> Result<(), XcError> {
         debug!("monitor_singlestep: {}", enable);
         (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
-        (self.libxenctrl.monitor_singlestep)(
+        let rc = (self.libxenctrl.monitor_singlestep)(
             self.handle.as_ptr(),
             domid.try_into().unwrap(),
             enable,
         );
-        last_error!(self, ())
+        last_error!(self, (), rc)
     }
 
     pub fn monitor_write_ctrlreg(
@@ -432,7 +437,7 @@ impl XenControl {
         if rc < 0 {
             debug!("The error is {}", Error::last_os_error());
         }
-        last_error!(self, ())
+        last_error!(self, (), rc)
     }
 
     pub fn set_mem_access(
@@ -445,14 +450,14 @@ impl XenControl {
         debug!("set_mem_access: {:?} on pfn {}", access, first_pfn);
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.set_mem_access)(
+        let rc = (self.libxenctrl.set_mem_access)(
             xc,
             domid.try_into().unwrap(),
             access.try_into().unwrap(),
             first_pfn,
             nr,
         );
-        last_error!(self, ())
+        last_error!(self, (), rc)
     }
 
     pub fn get_mem_access(&self, domid: u32, pfn: u64) -> Result<XenPageAccess, XcError> {
@@ -460,8 +465,8 @@ impl XenControl {
         let xc = self.handle.as_ptr();
         let mut access: xenmem_access_t = xenmem_access_t_XENMEM_access_n;
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.get_mem_access)(xc, domid.try_into().unwrap(), pfn, &mut access);
-        last_error!(self, access.try_into().unwrap())
+        let rc = (self.libxenctrl.get_mem_access)(xc, domid.try_into().unwrap(), pfn, &mut access);
+        last_error!(self, access.try_into().unwrap(), rc)
     }
 
     pub fn domain_maximum_gpfn(&self, domid: u32) -> Result<u64, XcError> {
@@ -470,16 +475,17 @@ impl XenControl {
         #[allow(unused_assignments)]
         (self.libxenctrl.clear_last_error)(xc);
         let mut max_gpfn: u64 = 0;
-        (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), &mut max_gpfn);
-        last_error!(self, max_gpfn)
+        let rc =
+            (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), &mut max_gpfn);
+        last_error!(self, max_gpfn, rc)
     }
 
     fn close(&mut self) -> Result<(), XcError> {
         debug!("closing");
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.interface_close)(xc);
-        last_error!(self, ())
+        let rc = (self.libxenctrl.interface_close)(xc);
+        last_error!(self, (), rc)
     }
 }
 

@@ -16,13 +16,8 @@ jobs:
   security_audit:
     runs-on: ubuntu-latest
     steps:
-      - name: install cargo-audit
-        uses: actions-rs/install@v0.1
-        with:
-          crate: cargo-audit
-          version: latest
-      - uses: actions/checkout@v1
-      - name: perform audit check
-        uses: actions-rs/audit-check@v1
+      - uses: actions/checkout@v4
+
+      - uses: rustsec/audit-check@v1.4.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

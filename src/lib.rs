@@ -572,6 +572,8 @@ impl XenControl {
         last_error!(self, freq as _)
     }
 
+    /// As [PxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
+    /// provide it as `px_stat` to this function that will update the values.
     pub fn get_pxstat(&self, cpuid: u32, px_stat: &mut PxStat) -> Result<(), XcError> {
         debug!("get_pxstat");
         let xc = self.handle.as_ptr();
@@ -620,6 +622,8 @@ impl XenControl {
         last_error!(self, ())
     }
 
+    /// As [CxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
+    /// provide it as `cx_stat` to this function that will update the values.
     pub fn get_cxstat(&self, cpuid: u32, cx_stat: &mut CxStat) -> Result<(), XcError> {
         debug!("get_cxstat");
         let xc = self.handle.as_ptr();

@@ -544,27 +544,21 @@ impl XenControl {
         last_error!(self, physinfo)
     }
 
-    pub fn get_cpuinfo<'a>(
-        &'_ self,
-        infos: &'a mut [mem::MaybeUninit<xc_cpuinfo_t>],
-    ) -> Result<&'a [xc_cpuinfo_t], XcError> {
+    pub fn get_cpuinfo(&self, max_cpus: usize) -> Result<Vec<xc_cpuinfo_t>, XcError> {
         debug!("get_cpuinfo");
-        let xc = self.handle.as_ptr();
-        let mut nr_cpu = 0i32;
+        let mut infos = vec![xc_cpuinfo_t { idletime: 0 }; max_cpus];
+        let mut nr_cpus: i32 = 0;
 
-        (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.get_cpuinfo)(xc, infos.len() as i32, infos.as_mut_ptr() as _, &mut nr_cpu);
+        let rc = (self.libxenctrl.get_cpuinfo)(
+            self.handle.as_ptr(),
+            infos.len() as i32,
+            infos.as_mut_ptr() as _,
+            &mut nr_cpus,
+        );
 
-        assert!((nr_cpu as usize) <= infos.len());
+        infos.truncate(nr_cpus as usize);
 
-        last_error!(
-            self,
-            // Reinterpret infos slice as [xc_cpuinfo_t], which is valid as :
-            //  - MaybeUninit is repr(transparent)
-            //  - infos outlives its return value due to explicit borrow
-            //  - nr_cpu <= infos.len()
-            slice::from_raw_parts(infos.as_ptr() as _, nr_cpu as usize)
-        )
+        last_error!(self, infos, rc)
     }
 
     pub fn get_cpufreq_avg(&self, cpuid: u32) -> Result<u32, XcError> {

@@ -134,6 +134,29 @@ pub struct XenControl {
     libxenctrl: LibXenCtrl,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct XcVcpuInfo {
+    pub vcpu: u32,
+    pub online: u8,
+    pub blocked: u8,
+    pub running: u8,
+    pub cpu_time: u64,
+    pub cpu: u32,
+}
+
+impl From<xc_vcpuinfo_t> for XcVcpuInfo {
+    fn from(value: xc_vcpuinfo_t) -> Self {
+        Self {
+            vcpu: value.vcpu,
+            online: value.online,
+            blocked: value.blocked,
+            running: value.running,
+            cpu_time: value.cpu_time,
+            cpu: value.cpu,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct PxStat {
     pub total: u8,
@@ -499,7 +522,7 @@ impl XenControl {
         last_error!(self, max_gpfn, rc)
     }
 
-    pub fn vcpu_getinfo(&self, domid: u32, vcpu: u32) -> Result<xc_vcpuinfo_t, XcError> {
+    pub fn vcpu_getinfo(&self, domid: u32, vcpu: u32) -> Result<XcVcpuInfo, XcError> {
         debug!("vcpu_getinfo");
         let xc = self.handle.as_ptr();
         let mut vcpu_info = unsafe { mem::zeroed() };
@@ -507,7 +530,7 @@ impl XenControl {
         (self.libxenctrl.clear_last_error)(xc);
         (self.libxenctrl.vcpu_getinfo)(xc, domid, vcpu, &mut vcpu_info);
 
-        last_error!(self, vcpu_info)
+        last_error!(self, XcVcpuInfo::from(vcpu_info))
     }
 
     pub fn physinfo(&self) -> Result<xc_physinfo_t, XcError> {

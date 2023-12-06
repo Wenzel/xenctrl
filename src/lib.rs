@@ -528,9 +528,9 @@ impl XenControl {
         let mut vcpu_info = unsafe { mem::zeroed() };
 
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.vcpu_getinfo)(xc, domid, vcpu, &mut vcpu_info);
+        let rc = (self.libxenctrl.vcpu_getinfo)(xc, domid, vcpu, &mut vcpu_info);
 
-        last_error!(self, XcVcpuInfo::from(vcpu_info))
+        last_error!(self, XcVcpuInfo::from(vcpu_info), rc)
     }
 
     pub fn physinfo(&self) -> Result<xc_physinfo_t, XcError> {
@@ -539,9 +539,9 @@ impl XenControl {
         let mut physinfo = unsafe { mem::zeroed() };
 
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.physinfo)(xc, &mut physinfo);
+        let rc = (self.libxenctrl.physinfo)(xc, &mut physinfo);
 
-        last_error!(self, physinfo)
+        last_error!(self, physinfo, rc)
     }
 
     pub fn get_cpuinfo(&self, max_cpus: usize) -> Result<Vec<xc_cpuinfo_t>, XcError> {
@@ -567,9 +567,9 @@ impl XenControl {
         let mut freq: c_int = 0;
 
         (self.libxenctrl.clear_last_error)(xc);
-        (self.libxenctrl.get_cpufreq_avgfreq)(xc, cpuid as c_int, &mut freq);
+        let rc = (self.libxenctrl.get_cpufreq_avgfreq)(xc, cpuid as c_int, &mut freq);
 
-        last_error!(self, freq as _)
+        last_error!(self, freq as _, rc)
     }
 
     /// As [PxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
@@ -619,7 +619,7 @@ impl XenControl {
             px_stat.cur = px_stat_ffi.cur;
         }
 
-        last_error!(self, ())
+        last_error!(self, (), ret)
     }
 
     /// As [CxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
@@ -667,7 +667,7 @@ impl XenControl {
             cx_stat.nr_cc = cx_stat_ffi.nr_cc;
         }
 
-        last_error!(self, ())
+        last_error!(self, (), ret)
     }
 
     fn close(&mut self) -> Result<(), XcError> {

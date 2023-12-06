@@ -207,6 +207,16 @@ impl XenControl {
         Self::new(None, None, 0)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let mut xc = XenControl::new_default()?;
+    /// let dom_info = xc.domain_getinfo(1)?;
+    /// println!("dominfo: {:?}", dom_info);
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_getinfo(&self, domid: u32) -> Result<Option<xc_dominfo_t>, XcError> {
         let xc = self.handle.as_ptr();
         let mut domain_info = unsafe { mem::zeroed() };
@@ -219,6 +229,15 @@ impl XenControl {
         )
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON};
+    ///
+    /// # let mut xc = XenControl::new_default()?;
+    /// xc.domain_debug_control(1, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON, 0)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_debug_control(&self, domid: u32, op: u32, vcpu: u32) -> Result<(), XcError> {
         debug!("domain_debug_control: op: {}, vcpu: {}", op, vcpu);
         (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
@@ -226,6 +245,16 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let mut xc = XenControl::new_default()?;
+    /// let hvm_cpu = xc.domain_hvm_getcontext_partial(1, 0)?;
+    /// println!("RIP: {:?}", hvm_cpu.rip);
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_hvm_getcontext_partial(
         &self,
         domid: u32,
@@ -251,6 +280,19 @@ impl XenControl {
         last_error!(self, hvm_cpu, rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    /// # use std::convert::TryInto;
+    ///
+    /// # let mut xc = XenControl::new_default()?;
+    /// let (buffer, mut cpu, size) = xc.domain_hvm_getcontext(1, 0)?;
+    /// // set RIP
+    /// cpu.rip = 0xdeadbeef;
+    /// xc.domain_hvm_setcontext(1, buffer, size.try_into().unwrap())?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_hvm_setcontext(
         &self,
         domid: u32,
@@ -264,6 +306,16 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let mut xc = XenControl::new_default()?;
+    /// let (buffer, mut cpu, size) = xc.domain_hvm_getcontext(1, 0)?;
+    /// println!("RIP: {:?}", cpu.rip);
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_hvm_getcontext(
         &self,
         domid: u32,
@@ -305,6 +357,15 @@ impl XenControl {
         last_error!(self, (buffer, *cpu_ptr, size.try_into().unwrap()))
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let mut xc = XenControl::new_default()?;
+    /// let (_ring_page, back_ring, remote_port) = xc.monitor_enable(1)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn monitor_enable(
         &mut self,
         domid: u32,
@@ -338,6 +399,19 @@ impl XenControl {
         Ok((ring_page, back_ring, remote_port))
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    /// # use xenvmevent_sys::vm_event_back_ring;
+    /// # use std::mem::MaybeUninit;
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// // assume back_ring from `monitor_enable`
+    /// let mut back_ring: vm_event_back_ring = Default::default();
+    /// let req = xc.get_request(&mut back_ring)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn get_request(
         &self,
         back_ring: &mut vm_event_back_ring,
@@ -352,6 +426,20 @@ impl XenControl {
         Ok(req_from_ring)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    /// # use xenvmevent_sys::{vm_event_response_t, vm_event_back_ring};
+    /// # use std::mem::MaybeUninit;
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let mut rsp = unsafe { MaybeUninit::<vm_event_response_t>::zeroed().assume_init() };
+    /// // assume back_ring from `monitor_enable`
+    /// let mut back_ring: vm_event_back_ring = Default::default();
+    /// let event_type = xc.put_response(&mut rsp, &mut back_ring)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn put_response(
         &self,
         rsp: &mut vm_event_response_t,
@@ -366,6 +454,19 @@ impl XenControl {
         Ok(())
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    /// # use xenvmevent_sys::vm_event_request_t;
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// // assume req from `get_request`
+    /// let req: vm_event_request_t = Default::default();
+    /// let event_type = xc.get_event_type(req)?;
+    /// println!("XenEventType: {:?}", event_type);
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn get_event_type(&self, req: vm_event_request_t) -> Result<XenEventType, XcError> {
         let ev_type: XenEventType;
         unsafe {
@@ -400,6 +501,15 @@ impl XenControl {
         Ok(ev_type)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// xc.monitor_disable(1)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn monitor_disable(&self, domid: u32) -> Result<(), XcError> {
         debug!("monitor_disable");
         let xc = self.handle.as_ptr();
@@ -408,6 +518,15 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// xc.domain_pause(1)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_pause(&self, domid: u32) -> Result<(), XcError> {
         debug!("domain pause");
         let xc = self.handle.as_ptr();
@@ -416,6 +535,15 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// xc.domain_unpause(1)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_unpause(&self, domid: u32) -> Result<(), XcError> {
         debug!("domain_unpause");
         let xc = self.handle.as_ptr();
@@ -424,6 +552,15 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// xc.monitor_software_breakpoint(1, true)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn monitor_software_breakpoint(&self, domid: u32, enable: bool) -> Result<(), XcError> {
         debug!("monitor_software_breakpoint: {}", enable);
         let xc = self.handle.as_ptr();
@@ -435,6 +572,16 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let sysenter_cs_index = 0x174;
+    /// xc.monitor_mov_to_msr(1, sysenter_cs_index, true)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn monitor_mov_to_msr(&self, domid: u32, msr: u32, enable: bool) -> Result<(), XcError> {
         debug!("monitor_mov_to_msr: {:x} {}", msr, enable);
         let xc = self.handle.as_ptr();
@@ -446,6 +593,15 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// xc.monitor_singlestep(1, true)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn monitor_singlestep(&self, domid: u32, enable: bool) -> Result<(), XcError> {
         debug!("monitor_singlestep: {}", enable);
         (self.libxenctrl.clear_last_error)(self.handle.as_ptr());
@@ -457,6 +613,15 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, XenCr, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// xc.monitor_write_ctrlreg(1, XenCr::Cr3, true, false, false)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn monitor_write_ctrlreg(
         &self,
         domid: u32,
@@ -482,6 +647,15 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, XenPageAccess, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// xc.set_mem_access(1, XenPageAccess::X, 0x1234, 1)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn set_mem_access(
         &self,
         domid: u32,
@@ -502,6 +676,16 @@ impl XenControl {
         last_error!(self, (), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let page_access = xc.get_mem_access(1, 0x1234)?;
+    /// println!("XenPageAccess: {:?}", page_access);
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn get_mem_access(&self, domid: u32, pfn: u64) -> Result<XenPageAccess, XcError> {
         debug!("get_mem_access");
         let xc = self.handle.as_ptr();
@@ -511,6 +695,15 @@ impl XenControl {
         last_error!(self, access.try_into().unwrap(), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let max_gfn = xc.domain_maximum_gpfn(1)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn domain_maximum_gpfn(&self, domid: u32) -> Result<u64, XcError> {
         debug!("domain_maximum_gfn");
         let xc = self.handle.as_ptr();
@@ -522,6 +715,16 @@ impl XenControl {
         last_error!(self, max_gpfn, rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let vcpuinfo = xc.vcpu_getinfo(1, 1)?;
+    /// println!("XcVcpuInfo: {:?}", vcpuinfo);
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn vcpu_getinfo(&self, domid: u32, vcpu: u32) -> Result<XcVcpuInfo, XcError> {
         debug!("vcpu_getinfo");
         let xc = self.handle.as_ptr();
@@ -533,6 +736,16 @@ impl XenControl {
         last_error!(self, XcVcpuInfo::from(vcpu_info), rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let physinfo = xc.physinfo()?;
+    /// println!("threads_per_code: {}, cores_per_socket: {}, nr_cpus: {}", physinfo.threads_per_core, physinfo.cores_per_socket, physinfo.nr_cpus);
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn physinfo(&self) -> Result<xc_physinfo_t, XcError> {
         debug!("physinfo");
         let xc = self.handle.as_ptr();
@@ -544,6 +757,18 @@ impl XenControl {
         last_error!(self, physinfo, rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let vec = xc.get_cpuinfo(8)?;
+    /// for (i, vcpuinfo)  in vec.iter().enumerate() {
+    ///     println!("[{}] idletime: {}", i, vcpuinfo.idletime);
+    /// }
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn get_cpuinfo(&self, max_cpus: usize) -> Result<Vec<xc_cpuinfo_t>, XcError> {
         debug!("get_cpuinfo");
         let mut infos = vec![xc_cpuinfo_t { idletime: 0 }; max_cpus];
@@ -561,6 +786,15 @@ impl XenControl {
         last_error!(self, infos, rc)
     }
 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let avg_freq = xc.get_cpufreq_avg(1)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn get_cpufreq_avg(&self, cpuid: u32) -> Result<u32, XcError> {
         debug!("get_cpufreq_avg");
         let xc = self.handle.as_ptr();
@@ -574,6 +808,16 @@ impl XenControl {
 
     /// As [PxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
     /// provide it as `px_stat` to this function that will update the values.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, PxStat, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let mut pxstat = Default::default();
+    /// xc.get_pxstat(1, &mut pxstat)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn get_pxstat(&self, cpuid: u32, px_stat: &mut PxStat) -> Result<(), XcError> {
         debug!("get_pxstat");
         let xc = self.handle.as_ptr();
@@ -624,6 +868,16 @@ impl XenControl {
 
     /// As [CxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
     /// provide it as `cx_stat` to this function that will update the values.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use xenctrl::{XenControl, CxStat, error::XcError};
+    ///
+    /// # let xc = XenControl::new_default()?;
+    /// let mut cxstat = Default::default();
+    /// xc.get_pxstat(1, &mut cxstat)?;
+    /// # Ok::<(), XcError>(())
+    /// ```
     pub fn get_cxstat(&self, cpuid: u32, cx_stat: &mut CxStat) -> Result<(), XcError> {
         debug!("get_cxstat");
         let xc = self.handle.as_ptr();

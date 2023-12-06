@@ -13,24 +13,24 @@ use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
 use libxenctrl::LibXenCtrl;
 use num_traits::FromPrimitive;
-use std::io::Error;
 use std::{
     alloc::{alloc_zeroed, Layout},
     convert::{From, TryFrom, TryInto},
-    ffi,
-    ffi::c_void,
+    ffi::{self, c_void},
+    io::Error,
     mem,
-    os::raw::c_uint,
+    os::raw::{c_int, c_uint},
     ptr::{null_mut, NonNull},
     slice,
 };
 
 use xenctrl_sys::{
-    xc_dominfo_t, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
-    xenmem_access_t, xenmem_access_t_XENMEM_access_n, xenmem_access_t_XENMEM_access_r,
-    xenmem_access_t_XENMEM_access_rw, xenmem_access_t_XENMEM_access_rwx,
-    xenmem_access_t_XENMEM_access_rx, xenmem_access_t_XENMEM_access_w,
-    xenmem_access_t_XENMEM_access_wx, xenmem_access_t_XENMEM_access_x, xentoollog_logger,
+    xc_cx_stat, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
+    xc_px_stat, xc_px_val, xenmem_access_t, xenmem_access_t_XENMEM_access_n,
+    xenmem_access_t_XENMEM_access_r, xenmem_access_t_XENMEM_access_rw,
+    xenmem_access_t_XENMEM_access_rwx, xenmem_access_t_XENMEM_access_rx,
+    xenmem_access_t_XENMEM_access_w, xenmem_access_t_XENMEM_access_wx,
+    xenmem_access_t_XENMEM_access_x, xentoollog_logger,
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
@@ -41,8 +41,8 @@ use xenvmevent_sys::{
 
 // re-exported definitions
 pub use xenctrl_sys::{
-    hvm_hw_cpu, hvm_save_descriptor, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF,
-    XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON, __HVM_SAVE_TYPE_CPU,
+    hvm_hw_cpu, hvm_save_descriptor, xc_cpuinfo_t, xc_dominfo_t, xc_physinfo_t, xc_vcpuinfo_t,
+    XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON, __HVM_SAVE_TYPE_CPU,
 };
 
 use error::XcError;
@@ -134,6 +134,52 @@ pub struct XenControl {
     libxenctrl: LibXenCtrl,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct XcVcpuInfo {
+    pub vcpu: u32,
+    pub online: u8,
+    pub blocked: u8,
+    pub running: u8,
+    pub cpu_time: u64,
+    pub cpu: u32,
+}
+
+impl From<xc_vcpuinfo_t> for XcVcpuInfo {
+    fn from(value: xc_vcpuinfo_t) -> Self {
+        Self {
+            vcpu: value.vcpu,
+            online: value.online,
+            blocked: value.blocked,
+            running: value.running,
+            cpu_time: value.cpu_time,
+            cpu: value.cpu,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PxStat {
+    pub total: u8,
+    pub usable: u8,
+    pub last: u8,
+    pub cur: u8,
+    pub transition_table: Vec<u64>,
+    pub values: Vec<xc_px_val>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CxStat {
+    pub nr: u32,
+    pub last: u32,
+    pub idle_time: u64,
+    pub triggers: Vec<u64>,
+    pub residencies: Vec<u64>,
+    pub nr_pc: u32,
+    pub nr_cc: u32,
+    pub pc: Vec<u64>,
+    pub cc: Vec<u64>,
+}
+
 impl XenControl {
     pub fn new(
         logger: Option<&mut xentoollog_logger>,
@@ -163,7 +209,7 @@ impl XenControl {
 
     pub fn domain_getinfo(&self, domid: u32) -> Result<Option<xc_dominfo_t>, XcError> {
         let xc = self.handle.as_ptr();
-        let mut domain_info = unsafe { mem::MaybeUninit::<xc_dominfo_t>::zeroed().assume_init() };
+        let mut domain_info = unsafe { mem::zeroed() };
         (self.libxenctrl.clear_last_error)(xc);
         let count = (self.libxenctrl.domain_getinfo)(xc, domid, 1, &mut domain_info);
         last_error!(
@@ -186,13 +232,11 @@ impl XenControl {
         vcpu: u16,
     ) -> Result<hvm_hw_cpu, XcError> {
         let xc = self.handle.as_ptr();
-        let mut hvm_cpu: hvm_hw_cpu =
-            unsafe { mem::MaybeUninit::<hvm_hw_cpu>::zeroed().assume_init() };
+        let mut hvm_cpu: hvm_hw_cpu = unsafe { mem::zeroed() };
         // cast to mut c_void*
         let hvm_cpu_ptr = &mut hvm_cpu as *mut _ as *mut c_void;
         let hvm_size: u32 = mem::size_of::<hvm_hw_cpu>().try_into().unwrap();
-        let hvm_save_cpu =
-            unsafe { mem::MaybeUninit::<__HVM_SAVE_TYPE_CPU>::zeroed().assume_init() };
+        let hvm_save_cpu: __HVM_SAVE_TYPE_CPU = unsafe { mem::zeroed() };
         let hvm_save_code_cpu: u16 = mem::size_of_val(&hvm_save_cpu.c).try_into().unwrap();
 
         (self.libxenctrl.clear_last_error)(xc);
@@ -238,8 +282,7 @@ impl XenControl {
         // Locate runtime CPU registers in the context record. This function returns information about the context of a hvm domain.
         (self.libxenctrl.domain_hvm_getcontext)(xc, domid, buffer, size.try_into().unwrap());
         let mut offset: u32 = 0;
-        let hvm_save_cpu =
-            unsafe { mem::MaybeUninit::<__HVM_SAVE_TYPE_CPU>::zeroed().assume_init() };
+        let hvm_save_cpu: __HVM_SAVE_TYPE_CPU = unsafe { mem::zeroed() };
         let hvm_save_code_cpu: u16 = mem::size_of_val(&hvm_save_cpu.c).try_into().unwrap();
         let mut cpu_ptr: *mut hvm_hw_cpu = std::ptr::null_mut();
         unsafe {
@@ -283,12 +326,11 @@ impl XenControl {
             (*ring_page).rsp_prod = 0;
             (*ring_page).req_event = 1;
             (*ring_page).rsp_event = 1;
-            (*ring_page).pvt.pvt_pad = mem::MaybeUninit::zeroed().assume_init();
-            (*ring_page).__pad = mem::MaybeUninit::zeroed().assume_init();
+            (*ring_page).pvt.pvt_pad = mem::zeroed();
+            (*ring_page).__pad = mem::zeroed();
         }
         // BACK_RING_INIT(&back_ring, ring_page, XC_PAGE_SIZE);
-        let mut back_ring: vm_event_back_ring =
-            unsafe { mem::MaybeUninit::<vm_event_back_ring>::zeroed().assume_init() };
+        let mut back_ring: vm_event_back_ring = unsafe { mem::zeroed() };
         back_ring.rsp_prod_pvt = 0;
         back_ring.req_cons = 0;
         back_ring.nr_ents = __RING_SIZE!(ring_page, PAGE_SIZE);
@@ -478,6 +520,154 @@ impl XenControl {
         let rc =
             (self.libxenctrl.domain_maximum_gpfn)(xc, domid.try_into().unwrap(), &mut max_gpfn);
         last_error!(self, max_gpfn, rc)
+    }
+
+    pub fn vcpu_getinfo(&self, domid: u32, vcpu: u32) -> Result<XcVcpuInfo, XcError> {
+        debug!("vcpu_getinfo");
+        let xc = self.handle.as_ptr();
+        let mut vcpu_info = unsafe { mem::zeroed() };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let rc = (self.libxenctrl.vcpu_getinfo)(xc, domid, vcpu, &mut vcpu_info);
+
+        last_error!(self, XcVcpuInfo::from(vcpu_info), rc)
+    }
+
+    pub fn physinfo(&self) -> Result<xc_physinfo_t, XcError> {
+        debug!("physinfo");
+        let xc = self.handle.as_ptr();
+        let mut physinfo = unsafe { mem::zeroed() };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let rc = (self.libxenctrl.physinfo)(xc, &mut physinfo);
+
+        last_error!(self, physinfo, rc)
+    }
+
+    pub fn get_cpuinfo(&self, max_cpus: usize) -> Result<Vec<xc_cpuinfo_t>, XcError> {
+        debug!("get_cpuinfo");
+        let mut infos = vec![xc_cpuinfo_t { idletime: 0 }; max_cpus];
+        let mut nr_cpus: i32 = 0;
+
+        let rc = (self.libxenctrl.get_cpuinfo)(
+            self.handle.as_ptr(),
+            infos.len() as i32,
+            infos.as_mut_ptr() as _,
+            &mut nr_cpus,
+        );
+
+        infos.truncate(nr_cpus as usize);
+
+        last_error!(self, infos, rc)
+    }
+
+    pub fn get_cpufreq_avg(&self, cpuid: u32) -> Result<u32, XcError> {
+        debug!("get_cpufreq_avg");
+        let xc = self.handle.as_ptr();
+        let mut freq: c_int = 0;
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let rc = (self.libxenctrl.get_cpufreq_avgfreq)(xc, cpuid as c_int, &mut freq);
+
+        last_error!(self, freq as _, rc)
+    }
+
+    /// As [PxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
+    /// provide it as `px_stat` to this function that will update the values.
+    pub fn get_pxstat(&self, cpuid: u32, px_stat: &mut PxStat) -> Result<(), XcError> {
+        debug!("get_pxstat");
+        let xc = self.handle.as_ptr();
+
+        let mut max_px: c_int = 0;
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let ret = (self.libxenctrl.get_max_px)(xc, cpuid as _, &mut max_px);
+
+        if ret != 0 {
+            return last_error!(self, ());
+        }
+
+        px_stat.values.resize(
+            max_px as _,
+            xc_px_val {
+                freq: 0,
+                residency: 0,
+                count: 0,
+            },
+        );
+
+        px_stat
+            .transition_table
+            .resize((max_px * max_px) as usize, 0);
+
+        let mut px_stat_ffi = xc_px_stat {
+            total: 0,
+            usable: 0,
+            last: 0,
+            cur: 0,
+            trans_pt: px_stat.transition_table.as_mut_ptr(),
+            pt: px_stat.values.as_mut_ptr(),
+        };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let ret = (self.libxenctrl.get_pxstat)(xc, cpuid as c_int, &mut px_stat_ffi);
+
+        if ret == 0 {
+            px_stat.total = px_stat_ffi.total;
+            px_stat.usable = px_stat_ffi.usable;
+            px_stat.last = px_stat_ffi.last;
+            px_stat.cur = px_stat_ffi.cur;
+        }
+
+        last_error!(self, (), ret)
+    }
+
+    /// As [CxStat] can hold quite large structures, you need to create an empty one using [Default] trait and
+    /// provide it as `cx_stat` to this function that will update the values.
+    pub fn get_cxstat(&self, cpuid: u32, cx_stat: &mut CxStat) -> Result<(), XcError> {
+        debug!("get_cxstat");
+        let xc = self.handle.as_ptr();
+        let mut max_cx: c_int = 0;
+
+        (self.libxenctrl.clear_last_error)(xc);
+        let ret = (self.libxenctrl.get_max_cx)(xc, cpuid as _, &mut max_cx);
+
+        if ret != 0 {
+            return last_error!(self, ());
+        }
+
+        const MAX_PKG_RESIDENCIES: usize = 12;
+        const MAX_CORE_RESIDENCIES: usize = 8;
+
+        cx_stat.triggers.resize(max_cx as _, 0);
+        cx_stat.residencies.resize(max_cx as _, 0);
+        cx_stat.pc.resize(MAX_PKG_RESIDENCIES, 0);
+        cx_stat.cc.resize(MAX_CORE_RESIDENCIES, 0);
+
+        let mut cx_stat_ffi = xc_cx_stat {
+            nr: max_cx as u32,
+            last: 0,
+            idle_time: 0,
+            triggers: cx_stat.triggers.as_mut_ptr(),
+            residencies: cx_stat.residencies.as_mut_ptr(),
+            nr_pc: MAX_PKG_RESIDENCIES as u32,
+            nr_cc: MAX_CORE_RESIDENCIES as u32,
+            pc: cx_stat.pc.as_mut_ptr(),
+            cc: cx_stat.cc.as_mut_ptr(),
+        };
+
+        (self.libxenctrl.clear_last_error)(xc);
+        (self.libxenctrl.get_cxstat)(xc, cpuid as c_int, &mut cx_stat_ffi);
+
+        if ret == 0 {
+            cx_stat.nr = cx_stat_ffi.nr;
+            cx_stat.last = cx_stat_ffi.last;
+            cx_stat.idle_time = cx_stat_ffi.idle_time;
+            cx_stat.nr_pc = cx_stat_ffi.nr_pc;
+            cx_stat.nr_cc = cx_stat_ffi.nr_cc;
+        }
+
+        last_error!(self, (), ret)
     }
 
     fn close(&mut self) -> Result<(), XcError> {

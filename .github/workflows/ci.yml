@@ -5,36 +5,45 @@ on:
     branches:
       - master
     tags:
-      - '*'
+      - "*"
   pull_request:
 
 jobs:
   check:
-    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        subcommand: ['fmt', 'build', 'clippy', 'test']
+        image_ref: ["20.04", "22.04", "24.04", "25.04", "25.10"]
+        subcommand: ["fmt", "build", "clippy", "test"]
         include:
-            - subcommand: 'clippy'
-              # treat warnings as errors
-              args: '-- -D warnings'
-            - subcommand: 'fmt'
-              args: '--check'
+          - subcommand: "clippy"
+            # treat warnings as errors
+            args: "-- -D warnings"
+          - subcommand: "fmt"
+            args: "--check"
+          - subcommand: "build"
+
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:${{ matrix.image_ref }}
     steps:
       - uses: actions/checkout@v4
 
+      - run: apt-get update && apt-get install -y curl build-essential clang
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: "clippy,rustfmt"
 
       - name: Install crate dependencies
-        run: sudo apt-get install -y libxen-dev
+        run: apt-get install -y libxen-dev
 
       - run: cargo ${{ matrix.subcommand }} ${{ matrix.args }}
 
   publish:
     needs: [check]
     runs-on: ubuntu-22.04
-    
+
     # publish on crates.io
     # only if push on master, and tag is 'v*'
     # this should be triggered by cargo release, which creates a new tag and pushes to the repo
@@ -45,7 +54,7 @@ jobs:
         run: sudo apt-get install -y libxen-dev
 
       - uses: actions/checkout@v4
-        
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Publish

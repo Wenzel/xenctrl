@@ -10,24 +10,34 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-22.04
     strategy:
       matrix:
+        image_ref: ['20.04', '22.04', '23.04', '23.10']
         subcommand: ['fmt', 'build', 'clippy', 'test']
         include:
-            - subcommand: 'clippy'
-              # treat warnings as errors
-              args: '-- -D warnings'
-            - subcommand: 'fmt'
-              args: '--check'
+          - subcommand: 'clippy'
+            # treat warnings as errors
+            args: '-- -D warnings'
+          - subcommand: 'fmt'
+            args: '--check'
+          - subcommand: 'build'
+ 
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:${{ matrix.image_ref }}
     steps:
       - uses: actions/checkout@v4
 
+      - run: apt-get update && apt-get install -y curl build-essential clang
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: 'clippy,rustfmt'
+
 
       - name: Install crate dependencies
-        run: sudo apt-get install -y libxen-dev
+        run: apt-get install -y libxen-dev
 
       - run: cargo ${{ matrix.subcommand }} ${{ matrix.args }}
 

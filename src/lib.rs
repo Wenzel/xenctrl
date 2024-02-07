@@ -667,7 +667,7 @@ impl XenControl {
         let rc = (self.libxenctrl.set_mem_access)(
             xc,
             domid.try_into().unwrap(),
-            access.try_into().unwrap(),
+            std::convert::Into::<xenmem_access_t>::into(access),
             first_pfn,
             nr,
         );

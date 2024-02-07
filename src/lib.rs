@@ -4,10 +4,8 @@ mod libxenctrl;
 
 #[macro_use]
 mod macros;
-#[macro_use]
-extern crate log;
 
-extern crate xenctrl_sys;
+use log::debug;
 
 use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;

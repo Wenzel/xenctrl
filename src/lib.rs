@@ -4,10 +4,8 @@ mod libxenctrl;
 
 #[macro_use]
 mod macros;
-#[macro_use]
-extern crate log;
 
-extern crate xenctrl_sys;
+use log::debug;
 
 use self::consts::PAGE_SIZE;
 use enum_primitive_derive::Primitive;
@@ -669,7 +667,7 @@ impl XenControl {
         let rc = (self.libxenctrl.set_mem_access)(
             xc,
             domid.try_into().unwrap(),
-            access.try_into().unwrap(),
+            std::convert::Into::<xenmem_access_t>::into(access),
             first_pfn,
             nr,
         );

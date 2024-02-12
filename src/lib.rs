@@ -8,9 +8,8 @@ mod macros;
 use log::debug;
 
 use self::consts::PAGE_SIZE;
-use enum_primitive_derive::Primitive;
 use libxenctrl::LibXenCtrl;
-use num_traits::FromPrimitive;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::{
     alloc::{alloc_zeroed, Layout},
     convert::{From, TryFrom, TryInto},
@@ -91,7 +90,7 @@ impl From<XenPageAccess> for xenmem_access_t {
     }
 }
 
-#[derive(Primitive, Debug, Copy, Clone, PartialEq)]
+#[derive(TryFromPrimitive, IntoPrimitive, Debug, Copy, Clone, PartialEq)]
 #[repr(u32)]
 pub enum XenCr {
     Cr0 = VM_EVENT_X86_CR0,
@@ -470,8 +469,7 @@ impl XenControl {
         unsafe {
             ev_type = match req.reason {
                 VM_EVENT_REASON_WRITE_CTRLREG => XenEventType::Cr {
-                    cr_type: XenCr::from_i32(req.u.write_ctrlreg.index.try_into().unwrap())
-                        .unwrap(),
+                    cr_type: XenCr::try_from(req.u.write_ctrlreg.index).unwrap(),
                     new: req.u.write_ctrlreg.new_value,
                     old: req.u.write_ctrlreg.old_value,
                 },

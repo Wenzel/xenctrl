@@ -23,11 +23,8 @@ use std::{
 
 use xenctrl_sys::{
     xc_cx_stat, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
-    xc_px_stat, xc_px_val, xenmem_access_t, xenmem_access_t_XENMEM_access_n,
-    xenmem_access_t_XENMEM_access_r, xenmem_access_t_XENMEM_access_rw,
-    xenmem_access_t_XENMEM_access_rwx, xenmem_access_t_XENMEM_access_rx,
-    xenmem_access_t_XENMEM_access_w, xenmem_access_t_XENMEM_access_wx,
-    xenmem_access_t_XENMEM_access_x, xentoollog_logger,
+    xc_px_stat, xc_px_val, xenmem_access_t, xenmem_access_t_XENMEM_access_default,
+    xentoollog_logger,
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
@@ -44,7 +41,7 @@ pub use xenctrl_sys::{
 
 use error::XcError;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(TryFromPrimitive, IntoPrimitive, Copy, Clone, Debug)]
 #[repr(u32)]
 pub enum XenPageAccess {
     NIL,
@@ -55,39 +52,6 @@ pub enum XenPageAccess {
     RX,
     WX,
     RWX,
-}
-
-impl TryFrom<xenmem_access_t> for XenPageAccess {
-    type Error = &'static str;
-    fn try_from(access: xenmem_access_t) -> Result<Self, Self::Error> {
-        #[allow(non_upper_case_globals)]
-        match access {
-            xenmem_access_t_XENMEM_access_n => Ok(XenPageAccess::NIL),
-            xenmem_access_t_XENMEM_access_r => Ok(XenPageAccess::R),
-            xenmem_access_t_XENMEM_access_w => Ok(XenPageAccess::W),
-            xenmem_access_t_XENMEM_access_rw => Ok(XenPageAccess::RW),
-            xenmem_access_t_XENMEM_access_x => Ok(XenPageAccess::X),
-            xenmem_access_t_XENMEM_access_rx => Ok(XenPageAccess::RX),
-            xenmem_access_t_XENMEM_access_wx => Ok(XenPageAccess::WX),
-            xenmem_access_t_XENMEM_access_rwx => Ok(XenPageAccess::RWX),
-            _ => Err("not implemented"),
-        }
-    }
-}
-
-impl From<XenPageAccess> for xenmem_access_t {
-    fn from(access: XenPageAccess) -> Self {
-        match access {
-            XenPageAccess::NIL => xenmem_access_t_XENMEM_access_n,
-            XenPageAccess::R => xenmem_access_t_XENMEM_access_r,
-            XenPageAccess::W => xenmem_access_t_XENMEM_access_w,
-            XenPageAccess::RW => xenmem_access_t_XENMEM_access_rw,
-            XenPageAccess::X => xenmem_access_t_XENMEM_access_x,
-            XenPageAccess::RX => xenmem_access_t_XENMEM_access_rx,
-            XenPageAccess::WX => xenmem_access_t_XENMEM_access_wx,
-            XenPageAccess::RWX => xenmem_access_t_XENMEM_access_rwx,
-        }
-    }
 }
 
 #[derive(TryFromPrimitive, IntoPrimitive, Debug, Copy, Clone, PartialEq)]
@@ -685,7 +649,7 @@ impl XenControl {
     pub fn get_mem_access(&self, domid: u32, pfn: u64) -> Result<XenPageAccess, XcError> {
         debug!("get_mem_access");
         let xc = self.handle.as_ptr();
-        let mut access: xenmem_access_t = xenmem_access_t_XENMEM_access_n;
+        let mut access: xenmem_access_t = xenmem_access_t_XENMEM_access_default;
         (self.libxenctrl.clear_last_error)(xc);
         let rc = (self.libxenctrl.get_mem_access)(xc, domid.try_into().unwrap(), pfn, &mut access);
         last_error!(self, access.try_into().unwrap(), rc)

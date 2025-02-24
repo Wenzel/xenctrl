@@ -12,12 +12,12 @@ keywords = ["xen", "xenctrl"]
 categories = ["api-bindings"]
 
 [dependencies]
-libloading = "0.8.1"
-log = "0.4.20"
-xenctrl-sys = "0.1.1"
-xenvmevent-sys = "0.1.3"
-num_enum = "0.7.2"
-num-traits = "0.2.17"
+libloading = "0.8.6"
+log = "0.4.26"
+xenctrl-sys = "0.2.0"
+xenvmevent-sys = "0.2.0"
+num_enum = "0.7.3"
+num-traits = "0.2.19"
 
 [package.metadata.release]
 # releases are managed by cargo release, but publication is done on the CI

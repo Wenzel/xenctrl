@@ -21,10 +21,9 @@ use std::{
     slice,
 };
 
+pub use xenctrl_sys::xenmem_access_t;
 use xenctrl_sys::{
-    xc_cx_stat, xc_error_code_XC_ERROR_NONE, xc_error_code_XC_INTERNAL_ERROR, xc_interface,
-    xc_px_stat, xc_px_val, xenmem_access_t, xenmem_access_t_XENMEM_access_default,
-    xentoollog_logger,
+    xc_cx_stat, xc_error_code, xc_interface, xc_px_stat, xc_px_val, xentoollog_logger,
 };
 use xenvmevent_sys::{
     vm_event_back_ring, vm_event_request_t, vm_event_response_t, vm_event_sring,
@@ -41,17 +40,22 @@ pub use xenctrl_sys::{
 
 use error::XcError;
 
-#[derive(TryFromPrimitive, IntoPrimitive, Copy, Clone, Debug)]
-#[repr(u32)]
-pub enum XenPageAccess {
-    NIL,
-    R,
-    W,
-    RW,
-    X,
-    RX,
-    WX,
-    RWX,
+/// Converts a `u32` to `xenmem_access_t`, avoiding unsafe transmute.
+fn access_from_u32(value: u32) -> Result<xenmem_access_t, XcError> {
+    match value {
+        0 => Ok(xenmem_access_t::XENMEM_access_n),
+        1 => Ok(xenmem_access_t::XENMEM_access_r),
+        2 => Ok(xenmem_access_t::XENMEM_access_w),
+        3 => Ok(xenmem_access_t::XENMEM_access_rw),
+        4 => Ok(xenmem_access_t::XENMEM_access_x),
+        5 => Ok(xenmem_access_t::XENMEM_access_rx),
+        6 => Ok(xenmem_access_t::XENMEM_access_wx),
+        7 => Ok(xenmem_access_t::XENMEM_access_rwx),
+        8 => Ok(xenmem_access_t::XENMEM_access_rx2rw),
+        9 => Ok(xenmem_access_t::XENMEM_access_n2rwx),
+        10 => Ok(xenmem_access_t::XENMEM_access_default),
+        _ => Err(XcError::new("Invalid access value")),
+    }
 }
 
 #[derive(TryFromPrimitive, IntoPrimitive, Debug, Copy, Clone, PartialEq)]
@@ -158,7 +162,7 @@ impl XenControl {
 
         NonNull::new(xc_handle)
             .ok_or_else(|| {
-                let desc = (libxenctrl.error_code_to_desc)(xc_error_code_XC_INTERNAL_ERROR as _);
+                let desc = (libxenctrl.error_code_to_desc)(xc_error_code::XC_INTERNAL_ERROR as _);
                 XcError::new(unsafe { ffi::CStr::from_ptr(desc) }.to_str().unwrap())
             })
             .map(|handle| XenControl { handle, libxenctrl })
@@ -449,7 +453,7 @@ impl XenControl {
                 VM_EVENT_REASON_MEM_ACCESS => XenEventType::Pagefault {
                     gva: req.u.mem_access.gla,
                     gpa: 0, // not available
-                    access: req.u.mem_access.flags,
+                    access: access_from_u32(req.u.mem_access.flags)?,
                     view: 0,
                 },
                 VM_EVENT_REASON_SINGLESTEP => XenEventType::Singlestep {
@@ -610,29 +614,24 @@ impl XenControl {
     /// # Examples
     ///
     /// ```no_run
-    /// # use xenctrl::{XenControl, XenPageAccess, error::XcError};
+    /// # use xenctrl::{XenControl, xenmem_access_t, error::XcError};
     ///
     /// # let xc = XenControl::new_default()?;
-    /// xc.set_mem_access(1, XenPageAccess::X, 0x1234, 1)?;
+    /// xc.set_mem_access(1, xenmem_access_t::XENMEM_access_x, 0x1234, 1)?;
     /// # Ok::<(), XcError>(())
     /// ```
     pub fn set_mem_access(
         &self,
         domid: u32,
-        access: XenPageAccess,
+        access: xenmem_access_t,
         first_pfn: u64,
         nr: u32,
     ) -> Result<(), XcError> {
         debug!("set_mem_access: {:?} on pfn {}", access, first_pfn);
         let xc = self.handle.as_ptr();
         (self.libxenctrl.clear_last_error)(xc);
-        let rc = (self.libxenctrl.set_mem_access)(
-            xc,
-            domid.try_into().unwrap(),
-            std::convert::Into::<xenmem_access_t>::into(access),
-            first_pfn,
-            nr,
-        );
+        let rc =
+            (self.libxenctrl.set_mem_access)(xc, domid.try_into().unwrap(), access, first_pfn, nr);
         last_error!(self, (), rc)
     }
 
@@ -646,13 +645,13 @@ impl XenControl {
     /// println!("XenPageAccess: {:?}", page_access);
     /// # Ok::<(), XcError>(())
     /// ```
-    pub fn get_mem_access(&self, domid: u32, pfn: u64) -> Result<XenPageAccess, XcError> {
+    pub fn get_mem_access(&self, domid: u32, pfn: u64) -> Result<xenmem_access_t, XcError> {
         debug!("get_mem_access");
         let xc = self.handle.as_ptr();
-        let mut access: xenmem_access_t = xenmem_access_t_XENMEM_access_default;
+        let mut access: xenmem_access_t = xenmem_access_t::XENMEM_access_default;
         (self.libxenctrl.clear_last_error)(xc);
         let rc = (self.libxenctrl.get_mem_access)(xc, domid.try_into().unwrap(), pfn, &mut access);
-        last_error!(self, access.try_into().unwrap(), rc)
+        last_error!(self, access, rc)
     }
 
     /// # Examples

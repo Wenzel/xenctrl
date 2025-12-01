@@ -34,7 +34,7 @@ use xenvmevent_sys::{
 
 // re-exported definitions
 pub use xenctrl_sys::{
-    hvm_hw_cpu, hvm_save_descriptor, xc_cpuinfo_t, xc_dominfo_t, xc_physinfo_t, xc_vcpuinfo_t,
+    hvm_hw_cpu, hvm_save_descriptor, xc_cpuinfo_t, xc_domaininfo_t, xc_physinfo_t, xc_vcpuinfo_t,
     XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF, XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON, __HVM_SAVE_TYPE_CPU,
 };
 
@@ -182,7 +182,7 @@ impl XenControl {
     /// println!("dominfo: {:?}", dom_info);
     /// # Ok::<(), XcError>(())
     /// ```
-    pub fn domain_getinfolist(&self, domid: u32) -> Result<Option<xc_dominfo_t>, XcError> {
+    pub fn domain_getinfolist(&self, domid: u32) -> Result<Option<xc_domaininfo_t>, XcError> {
         let xc = self.handle.as_ptr();
         let mut domain_info = unsafe { mem::zeroed() };
         (self.libxenctrl.clear_last_error)(xc);

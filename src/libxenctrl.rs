@@ -1,7 +1,7 @@
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 
 use xenctrl_sys::{
-    domid_t, xc_cpuinfo_t, xc_cx_stat, xc_dominfo_t, xc_error, xc_interface, xc_physinfo_t,
+    domid_t, xc_cpuinfo_t, xc_cx_stat, xc_domaininfo_t, xc_error, xc_interface, xc_physinfo_t,
     xc_px_stat, xc_vcpuinfo_t, xen_pfn_t, xenmem_access_t, xentoollog_logger,
 };
 
@@ -28,7 +28,7 @@ type FnDomainGetInfoList = fn(
     xch: *mut xc_interface,
     first_domid: u32,
     max_doms: c_uint,
-    info: *mut xc_dominfo_t,
+    info: *mut xc_domaininfo_t,
 ) -> c_int;
 // xc_domain_hvm_getcontext_partial
 type FnDomainHVMGetcontextPartial = fn(

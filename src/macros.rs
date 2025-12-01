@@ -26,16 +26,26 @@ macro_rules! last_error {
 }
 
 macro_rules! __RING_SIZE {
-    ($name1: ident, $name2: ident) => {
-        unsafe {
-            __RD32!(
-                (($name2 as usize + $name1 as usize
-                    - &mut (*$name1).ring[0] as *mut xenvmevent_sys::vm_event_sring_entry as usize)
-                    / std::mem::size_of_val(&(*$name1).ring[0])) as u32
-            )
-        }
-    };
+    ($sring:expr, $page_size:expr) => {{
+        use core::mem;
+
+        // Pointer to start of the sring struct
+        let s_ptr = $sring as *mut _ as usize;
+
+        // Pointer to ring[0] – works with __IncompleteArrayField
+        let ring0_ptr = unsafe { (*$sring).ring.as_mut_ptr() as usize };
+
+        // Size of header before the ring[] array
+        let header_size = ring0_ptr - s_ptr;
+
+        // Number of entries that fit in (page_size - header_size)
+        let ents = (($page_size as usize) - header_size)
+            / mem::size_of::<xenvmevent_sys::vm_event_sring_entry>();
+
+        __RD32!(ents as u32)
+    }};
 }
+
 macro_rules! __RD2 {
     ($name: expr) => {
         if $name as u32 & 0x00000002 != 0 {

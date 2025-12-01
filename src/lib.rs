@@ -178,15 +178,15 @@ impl XenControl {
     /// # use xenctrl::{XenControl, error::XcError};
     ///
     /// # let mut xc = XenControl::new_default()?;
-    /// let dom_info = xc.domain_getinfo(1)?;
+    /// let dom_info = xc.domain_getinfolist(1)?;
     /// println!("dominfo: {:?}", dom_info);
     /// # Ok::<(), XcError>(())
     /// ```
-    pub fn domain_getinfo(&self, domid: u32) -> Result<Option<xc_dominfo_t>, XcError> {
+    pub fn domain_getinfolist(&self, domid: u32) -> Result<Option<xc_dominfo_t>, XcError> {
         let xc = self.handle.as_ptr();
         let mut domain_info = unsafe { mem::zeroed() };
         (self.libxenctrl.clear_last_error)(xc);
-        let count = (self.libxenctrl.domain_getinfo)(xc, domid, 1, &mut domain_info);
+        let count = (self.libxenctrl.domain_getinfolist)(xc, domid, 1, &mut domain_info);
         last_error!(
             self,
             if count == 1 { Some(domain_info) } else { None },

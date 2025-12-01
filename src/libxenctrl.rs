@@ -23,8 +23,8 @@ type FnGetLastError = fn(handle: *mut xc_interface) -> *const xc_error;
 type FnErrorCodeToDesc = fn(code: c_int) -> *const c_char;
 // xc_domain_debug_control
 type FnDomainDebugCOntrol = fn(xch: *mut xc_interface, domid: u32, sop: u32, vcpu: u32) -> c_int;
-//xc_domain_getinfo
-type FnDomainGetInfo = fn(
+//xc_domain_getinfolist
+type FnDomainGetInfoList = fn(
     xch: *mut xc_interface,
     first_domid: u32,
     max_doms: c_uint,
@@ -119,7 +119,7 @@ pub struct LibXenCtrl {
     pub get_last_error: RawSymbol<FnGetLastError>,
     pub error_code_to_desc: RawSymbol<FnErrorCodeToDesc>,
     pub domain_debug_control: RawSymbol<FnDomainDebugCOntrol>,
-    pub domain_getinfo: RawSymbol<FnDomainGetInfo>,
+    pub domain_getinfolist: RawSymbol<FnDomainGetInfoList>,
     pub domain_hvm_getcontext_partial: RawSymbol<FnDomainHVMGetcontextPartial>,
     pub domain_hvm_getcontext: RawSymbol<FnDomainHVMGetcontext>,
     pub domain_hvm_setcontext: RawSymbol<FnDomainHVMSetcontext>,
@@ -168,8 +168,9 @@ impl LibXenCtrl {
             lib.get(b"xc_domain_debug_control\0")?;
         let domain_debug_control = domain_debug_control_sym.into_raw();
 
-        let domain_getinfo_sym: Symbol<FnDomainGetInfo> = lib.get(b"xc_domain_getinfo\0")?;
-        let domain_getinfo = domain_getinfo_sym.into_raw();
+        let domain_getinfolist_sym: Symbol<FnDomainGetInfoList> =
+            lib.get(b"xc_domain_getinfolist\0")?;
+        let domain_getinfolist = domain_getinfolist_sym.into_raw();
 
         let domain_hvm_getcontext_partial_sym: Symbol<FnDomainHVMGetcontextPartial> =
             lib.get(b"xc_domain_hvm_getcontext_partial\0")?;
@@ -256,7 +257,7 @@ impl LibXenCtrl {
             get_last_error,
             error_code_to_desc,
             domain_debug_control,
-            domain_getinfo,
+            domain_getinfolist,
             domain_hvm_getcontext_partial,
             domain_hvm_getcontext,
             domain_hvm_setcontext,

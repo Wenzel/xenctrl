@@ -12,11 +12,11 @@ keywords = ["xen", "xenctrl"]
 categories = ["api-bindings"]
 
 [dependencies]
-libloading = "0.8.6"
-log = "0.4.26"
+libloading = "0.9.0"
+log = "0.4.28"
 xenctrl-sys = "0.2.0"
 xenvmevent-sys = "0.2.0"
-num_enum = "0.7.3"
+num_enum = "0.7.5"
 num-traits = "0.2.19"
 
 [package.metadata.release]
